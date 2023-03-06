@@ -1,0 +1,131 @@
+query CurrentUser {
+  currentUser {
+    username
+    name
+    email
+    profile
+    about
+    role
+    photo
+  }
+}
+
+query GetCatBlogs($getCatBlogsSlug: String!) {
+  getCatBlogs(slug: $getCatBlogsSlug) {
+    _id
+    createdAt
+    updatedAt
+    author {
+      username
+      name
+      profile
+    }
+    tags {
+      name
+      slug
+    }
+    categories {
+      name
+      slug
+    }
+    imageUri
+    mtitle
+    description
+    slug
+    title
+  }
+}
+
+query GetBlogBySlug($slug: String!) {
+  getBlogBySlug(slug: $slug) {
+    title
+    slug
+    description
+    body
+    mtitle
+    image
+    imageUri
+    active
+    likedBy {
+      username
+      name
+    }
+    comments {
+      content
+      by {
+        name
+        username
+      }
+      atBlog {
+        slug
+        title
+      }
+    }
+    _id
+    createdAt
+    updatedAt
+    author {
+      name
+      username
+    }
+    tags {
+      _id
+      slug
+      name
+    }
+    categories {
+      _id
+      slug
+      name
+    }
+  }
+}
+
+query ListBlogsWithCatTag {
+  listBlogsWithCatTag {
+    title
+    description
+    body
+    slug
+    _id
+    mtitle
+    image
+    imageUri
+    active
+    createdAt
+    updatedAt
+    author {
+      name
+    }
+    categories {
+      slug
+      name
+    }
+    tags {
+      slug
+      name
+    }
+  }
+}
+
+query GetRelatedBlogs(
+  $limit: Float
+  $tagIds: [String!]!
+  $catIds: [String!]!
+  $getRelatedBlogsSlug: String!
+) {
+  getRelatedBlogs(
+    limit: $limit
+    tagIds: $tagIds
+    catIds: $catIds
+    slug: $getRelatedBlogsSlug
+  ) {
+    imageUri
+    _id
+    slug
+    tags {
+      slug
+      name
+    }
+  }
+}
