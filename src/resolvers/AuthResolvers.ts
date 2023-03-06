@@ -1,4 +1,3 @@
-import sgMail from '@sendgrid/mail'
 import { AuthenticationError } from 'apollo-server-errors'
 import { isEmpty } from 'class-validator'
 import dotenv from 'dotenv'
@@ -7,20 +6,16 @@ import path from 'path'
 import shortId from 'shortid'
 import { Arg, Ctx, Mutation, Resolver } from 'type-graphql'
 
-import { TContext } from '../../types'
+import { TContext } from '../types'
 import { Service } from 'typedi'
 import { LoginResponse } from '../dtos/LoginResponse'
-import { UserModel } from '../../models'
-// import { preRegisterTemplate } from '../utils/sendgridTemplate';
+import { UserModel } from '../models'
 
 dotenv.config({ path: path.join(__dirname, '../.env.local') })
-
-sgMail.setApiKey(process.env.SENDGRID_API_KEY!)
 
 @Service()
 @Resolver()
 class AuthResolvers {
-    //without email validation
     @Mutation(() => Boolean)
     async register(
         @Arg('name') name: string,

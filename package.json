@@ -4,8 +4,14 @@
   "main": "index.js",
   "license": "MIT",
   "scripts": {
-    "dev": "ts-node-dev server.ts",
-    "serve": "ts-node server.ts"
+    "dev": "ts-node-dev src/server.ts",
+    "serve": "ts-node src/server.ts",
+    "watch": "tsc --project tsconfig.json --watch",
+    "prebuild": "rimraf build",
+    "build": "tsc --project tsconfig.build.json",
+    "prestart":"npm run build",
+    "start":"cross-env NODE_ENV=production node build/src/server.js",
+    "lint":"eslint . --ext .ts ./src --fix"
   },
   "dependencies": {
     "@envelop/core": "^3.0.3",

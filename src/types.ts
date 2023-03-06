@@ -1,6 +1,6 @@
 import Container from 'typedi'
-import { User } from './entities/user'
 import { Request,Response } from 'express'
+import { User } from './entities/user'
 
 export type UserPayload = Pick<User, '_id' | 'role'>
 

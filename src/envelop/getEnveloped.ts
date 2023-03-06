@@ -3,7 +3,7 @@ import { envelop } from "@envelop/core";
 import { useResponseCache, createInMemoryCache } from "@envelop/response-cache";
 import { createRedisCache } from "@envelop/response-cache-redis";
 import Redis from "ioredis";
-import { TContext } from "../../types";
+import { TContext } from "../types";
 import { useEngine, useSchema } from "@envelop/core";
 import * as GraphQLJS from "graphql";
 import { createSchema } from "../utils/createSchema";

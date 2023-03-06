@@ -1,5 +1,5 @@
 import { AuthChecker, ResolverData } from 'type-graphql'
-import { TContext } from '../../types'
+import { TContext } from '../types'
 
 
 export const authChecker: AuthChecker<TContext> = (

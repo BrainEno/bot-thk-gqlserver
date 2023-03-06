@@ -1,7 +1,7 @@
 import { decode } from 'jsonwebtoken'
 import Container from 'typedi'
 
-import { TContext, UserPayload } from '../../types'
+import { TContext, UserPayload } from '../types'
 
 
 

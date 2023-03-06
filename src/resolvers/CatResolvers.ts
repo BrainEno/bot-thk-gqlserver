@@ -2,7 +2,7 @@ import { Arg, Query, Resolver } from 'type-graphql'
 import { Service } from 'typedi'
 import { Blog } from '../entities/blog';
 
-import { BlogModel, CategoryModel } from '../../models'
+import { BlogModel, CategoryModel } from '../models'
 
 @Service()
 @Resolver()

@@ -9,9 +9,9 @@ import express from "express";
 import http from "http";
 import mongoose from "mongoose";
 
-import { createSchema } from "./src/utils/createSchema";
+import { createSchema } from "./utils/createSchema";
 // import getEnveloped from "./src/envelop/getEnveloped";
-import { context } from "./src/context/typeGraphQLContext";
+import { context } from "./context/typeGraphQLContext";
 import {
   ApolloServerPlugin,
   GraphQLRequestContext,

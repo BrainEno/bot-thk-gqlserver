@@ -1,9 +1,9 @@
 import { getModelForClass } from '@typegoose/typegoose'
-import { Blog } from './src/entities/blog'
-import { Category } from './src/entities/category'
-import { Message } from './src/entities/message'
-import { Tag } from './src/entities/tag'
-import { User } from './src/entities/user'
+import { Blog } from './entities/blog'
+import { Category } from './entities/category'
+import { Message } from './entities/message'
+import { Tag } from './entities/tag'
+import { User } from './entities/user'
 
 export const BlogModel = getModelForClass(Blog, {
     schemaOptions: {

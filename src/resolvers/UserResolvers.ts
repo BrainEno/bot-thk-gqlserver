@@ -1,9 +1,9 @@
 import { Ctx, Query, Resolver } from 'type-graphql'
 
 import { User } from '../entities/user'
-import { TContext } from '../../types'
+import { TContext } from '../types'
 import { Service } from 'typedi'
-import { UserModel } from '../../models'
+import { UserModel } from '../models'
 
 @Service()
 @Resolver()

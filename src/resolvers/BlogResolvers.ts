@@ -3,7 +3,7 @@ import { Service } from 'typedi'
 
 import { BlogInput, Blog } from '../entities/blog'
 import { UserInputError } from 'apollo-server-express'
-import { BlogModel } from '../../models'
+import { BlogModel } from '../models'
 import { isEmpty } from 'class-validator'
 
 @Service()
