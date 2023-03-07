@@ -13,7 +13,7 @@ class CatResolvers {
             const category = await CategoryModel.findOne({ slug: slug })
             if (category) {
                 const blogs = await BlogModel.find({
-                    $categories: { $search: category },
+                    categories: { $all: [category._id] },
                 })
                     .populate('categories', '_id name slug')
                     .populate('tags', '_id name slug')

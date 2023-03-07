@@ -1,5 +1,5 @@
 import { GraphQLScalarType, Kind } from 'graphql'
-import { ObjectId } from 'mongodb'
+import { ObjectId }from 'bson'
 
 export const ObjectIdScalar = new GraphQLScalarType({
     name: 'ObjectId',

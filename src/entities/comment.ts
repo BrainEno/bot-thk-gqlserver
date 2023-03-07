@@ -1,5 +1,6 @@
 import { getModelForClass, prop, Ref } from '@typegoose/typegoose'
-import { ObjectId } from 'mongodb'
+import { ObjectId } from 'bson'
+import { ObjectId as ObjectID } from 'mongoose'
 import { Field, ObjectType } from 'type-graphql'
 
 import { Blog } from './blog'
@@ -8,7 +9,7 @@ import { User } from './user'
 @ObjectType()
 export class Comment {
     @Field(() => ObjectId)
-    readonly _id: ObjectId
+    readonly _id: ObjectID
 
     @prop({ nullable: false })
     @Field({ nullable: false })

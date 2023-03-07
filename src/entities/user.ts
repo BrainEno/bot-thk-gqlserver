@@ -2,14 +2,15 @@ import { prop, Ref } from '@typegoose/typegoose'
 import { Exclude } from 'class-transformer'
 import { IsEmail, Length, MaxLength, MinLength } from 'class-validator'
 import crypto from 'crypto'
-import { ObjectId } from 'mongodb'
+import { ObjectId }from 'bson'
 import { Field, ObjectType } from 'type-graphql'
 import { Comment } from './comment'
+import { ObjectId as ObjectID } from 'mongoose'
 
 @ObjectType()
 export class User {
     @Field(() => ObjectId)
-    readonly _id: ObjectId
+    readonly _id: ObjectID
 
     @prop({
         type: () => String,
@@ -39,7 +40,7 @@ export class User {
         lowercase: true,
     })
     @Field()
-    @IsEmail({ message: '请填写有效的邮箱地址' })
+    @IsEmail()
     @Length(1, 50, { message: '邮箱地址不能为空' })
     email: string
 
