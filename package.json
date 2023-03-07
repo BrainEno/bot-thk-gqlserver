@@ -10,7 +10,7 @@
     "prebuild": "rimraf build",
     "build": "tsc --project tsconfig.build.json",
     "prestart": "npm run build",
-    "start": "cross-env NODE_ENV=production node build/src/server.js",
+    "start": "cross-env NODE_ENV=production node build/server.js",
     "lint": "eslint . --ext .ts ./src --fix"
   },
   "size-limit": [
