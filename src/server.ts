@@ -1,11 +1,9 @@
 import "reflect-metadata";
 
-import {
-  ApolloServerPluginDrainHttpServer,
-} from "apollo-server-core";
+import { ApolloServerPluginDrainHttpServer } from "apollo-server-core";
 import { ApolloServer } from "apollo-server-express";
 import dotenv from "dotenv";
-import express from "express";
+import express, { Request, Response, NextFunction } from "express";
 import http from "http";
 import mongoose from "mongoose";
 
@@ -30,6 +28,21 @@ const main = async () => {
   dotenv.config();
   const port = parseInt(process.env.PORT!, 10) || 4001;
   const app = express();
+  const router = express.Router();
+
+  router.use((_req: Request, res: Response, next: NextFunction) => {
+    res.header("Access-Control-Allow-Methods", "GET");
+    next();
+  });
+
+  router.get("health", (_req, res) => {
+    const data = {
+      uptime: process.uptime(),
+      message: "OK",
+      date: new Date(),
+    };
+    res.status(200).send(data);
+  });
 
   app.use(cookieParser());
   app.use(cors({ origin: "*" }));
