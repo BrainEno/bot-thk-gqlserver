@@ -10,10 +10,10 @@ class TagResolvers {
   @Query(() => [Blog])
   async getTagBlogs(@Arg("slug") slug: string): Promise<Blog[]> {
     try {
-      const Tag = await TagModel.findOne({ slug: slug });
-      if (Tag) {
+      const tag = await TagModel.findOne({ slug: slug });
+      if (tag) {
         const blogs = await BlogModel.find({
-          Tagegories: { $all: [Tag._id] },
+          tags: { $all: [tag._id] },
         })
           .populate("categories", "_id name slug")
           .populate("tags", "_id name slug")
