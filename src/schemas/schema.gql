@@ -10,6 +10,7 @@ type Query {
   getCatBlogs(slug: String!): [Blog!]!
   hello: String!
   currentUser: User
+  getTagBlogs(slug: String!): [Blog!]!
 }
 
 type Blog {

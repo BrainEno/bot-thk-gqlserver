@@ -10,10 +10,17 @@ import UserResolvers from "../resolvers/UserResolvers";
 // import { TypegooseMiddleware } from "../middlewares/TypegooseMiddleware";
 import { ObjectId } from "mongodb";
 import { ObjectIdScalar } from "./ObjectIdScalar";
+import TagResolvers from "../resolvers/TagResolvers";
 
 export const createSchema = () =>
   buildSchema({
-    resolvers: [AuthResolvers, UserResolvers, BlogResolvers, CatResolvers],
+    resolvers: [
+      AuthResolvers,
+      UserResolvers,
+      BlogResolvers,
+      CatResolvers,
+      TagResolvers,
+    ],
     authChecker: authChecker,
     authMode: "null",
     emitSchemaFile: {

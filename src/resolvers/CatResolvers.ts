@@ -20,7 +20,7 @@ class CatResolvers {
                     .populate('author', 'name username profile')
                     .sort({ createdAt: -1 })
                     .select(
-                        '_id title mtitle author body image imageUri slug description categories tags createdAt updatedAt active'
+                        '_id title mtitle author body imageUri slug description categories tags createdAt updatedAt active'
                     )
                     .exec();
 

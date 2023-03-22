@@ -36,6 +36,32 @@ query GetCatBlogs($getCatBlogsSlug: String!) {
   }
 }
 
+query GetTagBlogs($getTagBlogsSlug: String!) {
+  getTagBlogs(slug: $getTagBlogsSlug) {
+    _id
+    createdAt
+    updatedAt
+    author {
+      username
+      name
+      profile
+    }
+    tags {
+      name
+      slug
+    }
+    categories {
+      name
+      slug
+    }
+    imageUri
+    mtitle
+    description
+    slug
+    title
+  }
+}
+
 query GetBlogBySlug($slug: String!) {
   getBlogBySlug(slug: $slug) {
     title
