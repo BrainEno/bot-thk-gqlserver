@@ -19,7 +19,7 @@ class BlogResolvers {
             const blogs = await BlogModel.find()
                 .populate('categories', '_id name slug')
                 .populate('tags', '_id name slug')
-                .populate('author', '_id name username')
+                .populate('author', '_id name username profile')
                 .sort({ createdAt: -1 })
                 .select(
                     '_id title mtitle author body image imageUri slug description categories tags createdAt updatedAt'
@@ -60,6 +60,26 @@ class BlogResolvers {
         }
     }
 
+  @Query(() => [Blog])
+  async searchBlogs(@Arg("query") query: string): Promise<Blog[]> {
+    try {
+      const blogs = await BlogModel.find({
+        $or: [
+          { title: { $regex: query, $options: "i" } },
+          { body: { $regex: query, $options: "i" } },
+        ],
+      })
+        .populate("author", "name")
+        .select("slug title")
+        .exec();
+
+      if (!blogs) throw new Error(`blogs not found`);
+      return blogs;
+    } catch (err) {
+      throw err;
+    }
+  }
+  
     @Query(() => [Blog])
     async getRelatedBlogs(
         @Arg('slug') slug: string,

@@ -5,7 +5,7 @@ import { createRedisCache } from "@envelop/response-cache-redis";
 import Redis from "ioredis";
 import { TContext } from "../types";
 import { useEngine, useSchema } from "@envelop/core";
-import  GraphQLJS from "graphql";
+import GraphQLJS from "graphql";
 import { createSchema } from "../utils/createSchema";
 
 dotenv.config();
@@ -18,6 +18,16 @@ try {
     port: parseInt(process.env.REDIS_PORT!, 10) as number,
     username: "default",
     password: process.env.REDIS_PASSWORD as string,
+    lazyConnect: true,
+    connectTimeout: 15000,
+    retryStrategy: (times) => Math.min(times * 30, 1000),
+    reconnectOnError(error) {
+      const targetErrors = [/READONLY/, /ETIMEDOUT/];
+      console.warn(`Redis connection error: ${error.message}`, error);
+      return targetErrors.some((targetError) =>
+        targetError.test(error.message)
+      );
+    },
   });
   cache = createRedisCache({ redis });
 } catch (error) {

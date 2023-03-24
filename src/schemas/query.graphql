@@ -122,6 +122,7 @@ query ListBlogsWithCatTag {
     updatedAt
     author {
       name
+      profile
     }
     categories {
       slug
@@ -151,6 +152,16 @@ query GetRelatedBlogs(
     slug
     tags {
       slug
+      name
+    }
+  }
+}
+
+query SearchBlogs($query: String!) {
+  searchBlogs(query: $query) {
+    slug
+    title
+    author {
       name
     }
   }

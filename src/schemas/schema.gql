@@ -6,6 +6,7 @@
 type Query {
   listBlogsWithCatTag: [Blog!]!
   getBlogBySlug(slug: String!): Blog!
+  searchBlogs(query: String!): [Blog!]!
   getRelatedBlogs(limit: Float, tagIds: [String!]!, catIds: [String!]!, slug: String!): [Blog!]!
   getCatBlogs(slug: String!): [Blog!]!
   hello: String!
