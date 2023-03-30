@@ -1,9 +1,9 @@
 import { AuthChecker, ResolverData } from 'type-graphql'
-import { TContext } from '../types'
+import { MyContext } from '../types'
 
 
-export const authChecker: AuthChecker<TContext> = (
-    { context: { user } }: ResolverData<TContext>,
+export const authChecker: AuthChecker<MyContext> = (
+    { context: { user } }: ResolverData<MyContext>,
     roles: string[]
 ) => {
     if (roles&&roles.length === 0) {

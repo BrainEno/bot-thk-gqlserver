@@ -155,3 +155,13 @@ query GetRelatedBlogs(
     }
   }
 }
+
+query SearchBlogs($query: String!) {
+  searchBlogs(query: $query) {
+    slug
+    title
+    author {
+      name
+    }
+  }
+}

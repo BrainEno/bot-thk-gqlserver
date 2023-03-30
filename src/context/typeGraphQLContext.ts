@@ -1,11 +1,11 @@
 import { decode } from 'jsonwebtoken'
 import Container from 'typedi'
 
-import { TContext, UserPayload } from '../types'
+import { MyContext, UserPayload } from '../types'
 
 
 
-export const context = (context: TContext) => {
+export const context = (context: MyContext) => {
     const requestId = Math.floor(
         Math.random() * Number.MAX_SAFE_INTEGER
     ).toString()

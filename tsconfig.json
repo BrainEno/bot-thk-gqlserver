@@ -1,9 +1,16 @@
 {
   "compilerOptions": {
-    "typeRoots": ["./node_modules/@types/", "./typings/"],
-    "target": "es6",
-    "module": "commonjs",
-    "lib": ["dom", "es6", "es2017", "esnext.asynciterable"],
+    "typeRoots": [
+      "./node_modules/@types/",
+      "./typings/"
+    ],
+    "rootDir": "src",
+    "target": "es2020",
+    "module": "CommonJS",
+    "lib": [
+      "es2020",
+      "esnext.asynciterable"
+    ],
     "sourceMap": true,
     "outDir": "./build",
     "moduleResolution": "node",
@@ -25,11 +32,16 @@
     "baseUrl": ".",
     "types": []
   },
+  "ts-node": {
+    "esm": true
+  },
   "exclude": [
     "node_modules",
     "node_modules/*",
     "node_modules/@types/node/index.d.ts",
   ],
-  "include": ["src/**/*.tsx", "src/**/*.ts"]
+  "include": [
+    "src/**/*.tsx",
+    "src/**/*.ts"
+  ]
 }
-

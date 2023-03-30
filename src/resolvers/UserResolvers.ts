@@ -1,7 +1,7 @@
 import { Ctx, Query, Resolver } from 'type-graphql'
 
 import { User } from '../entities/user'
-import { TContext } from '../types'
+import { MyContext } from '../types'
 import { Service } from 'typedi'
 import { UserModel } from '../models'
 
@@ -14,9 +14,10 @@ class UserResolvers {
     }
 
     @Query(() => User, { nullable: true })
-    async currentUser(@Ctx() { user }: TContext): Promise<User | null> {
+    async currentUser(@Ctx() { user }: MyContext): Promise<User | null> {
         try {
-            if (user === null) return null
+            if (!user) return null
+            console.log(user)
             return await UserModel.findById(user._id)
         } catch (error) {
             console.log(error)
