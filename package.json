@@ -1,29 +1,19 @@
 {
   "name": "gql-server",
   "version": "1.0.0",
-  "main": "index.js",
   "license": "MIT",
   "scripts": {
-    "dev": "ts-node-dev src/server.ts",
-    "serve": "ts-node src/server.ts",
+    "dev": "nodemon --watch 'src/**/*.ts' --exec ts-node src/server.ts",
     "watch": "tsc --project tsconfig.json --watch",
     "prebuild": "rimraf build",
     "build": "tsc --project tsconfig.build.json",
     "prestart": "npm run build",
-    "start": "cross-env NODE_ENV=production node build/server.js",
+    "start": "cross-env NODE_ENV=production node --experimental-specifier-resolution=node --loader ts-node/esm build/server.js",
     "lint": "eslint . --ext .ts ./src --fix"
   },
-  "size-limit": [
-    {
-      "path": "build/",
-      "limit": "240 MB"
-    }
-  ],
   "dependencies": {
-    "@envelop/core": "^3.0.3",
-    "@envelop/execute-subscription-event": "^3.0.3",
-    "@envelop/response-cache": "^4.0.3",
-    "@envelop/response-cache-redis": "^2.0.3",
+    "@apollo/server-gateway-interface": "^1.1.0",
+    "@apollo/utils.keyvaluecache": "^2.1.0",
     "@typegoose/typegoose": "^10.3.0",
     "apollo-server-express": "^3.12.0",
     "apollo-server-plugin-base": "^3.6.2",
@@ -56,9 +46,9 @@
     "@types/graphql": "^14.5.0",
     "@types/shortid": "^0.0.29",
     "cross-env": "^7.0.3",
+    "nodemon": "^2.0.22",
     "size-limit": "^8.2.4",
-    "ts-node": "^10.4.0",
-    "ts-node-dev": "^2.0.0",
+    "ts-node": "^10.9.1",
     "typescript": "^4.8.4"
   }
 }

@@ -1,5 +1,5 @@
 import path from "path";
-import { buildSchema } from "type-graphql";
+import { buildSchemaSync } from "type-graphql";
 import { Container } from "typedi";
 
 import { authChecker } from "../middlewares/authChecker";
@@ -13,7 +13,7 @@ import { ObjectIdScalar } from "./ObjectIdScalar";
 import TagResolvers from "../resolvers/TagResolvers";
 
 export const createSchema = () =>
-  buildSchema({
+  buildSchemaSync({
     resolvers: [
       AuthResolvers,
       UserResolvers,

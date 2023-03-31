@@ -74,14 +74,10 @@ class AuthResolvers {
                 { expiresIn: '7d' }
             )
 
-            const { _id, role } = user
-
-            context.user = { _id, role }
-
-            // context.res.cookie('token', token, {
-            //     httpOnly: true,
-            //     maxAge: 1000 * 60 * 60 * 24 * 7,
-            // })
+            context.res.cookie('token', token, {
+                httpOnly: true,
+                maxAge: 1000 * 60 * 60 * 24 * 7,
+            })
 
             return { accessToken: token }
         } catch (error) {

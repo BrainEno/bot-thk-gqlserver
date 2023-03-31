@@ -6,10 +6,9 @@ import dotenv from "dotenv";
 import express from "express";
 import http from "http";
 import mongoose from "mongoose";
+import { InMemoryLRUCache } from "@apollo/utils.keyvaluecache";
 
 import { createSchema } from "./utils/createSchema";
-// import getEnveloped from "./src/envelop/getEnveloped";
-import { context } from "./context/typeGraphQLContext";
 import {
   ApolloServerPlugin,
   GraphQLRequestContext,
@@ -23,6 +22,12 @@ import {
 import cookieParser from "cookie-parser";
 import { TContext } from "./types";
 import cors from "cors";
+import { context } from "./context/typeGraphQLContext";
+
+const corsOptions = {
+  origin: [process.env.CLIENT_URL as string, "http://localhost:3000"],
+  credentials: true,
+};
 
 const main = async () => {
   dotenv.config();
@@ -30,7 +35,7 @@ const main = async () => {
   const app = express();
 
   app.use(cookieParser());
-  app.use(cors({ origin: "*" }));
+  app.use(cors(corsOptions));
 
   app.get("/", (_req, res) => {
     const data = {
@@ -51,27 +56,17 @@ const main = async () => {
     console.log("Error connecting to MongoDB:", error?.message);
   }
 
-  const schema = await createSchema();
+  const schema = createSchema();
 
   const apolloServer = new ApolloServer({
     schema,
     context,
-    // executor: async (requestContext) => {
-    //   const { schema, execute, contextFactory } = getEnveloped({
-    //     req: requestContext.request.http,
-    //   });
-
-    //   return execute({
-    //     schema,
-    //     document: requestContext.document,
-    //     contextValue: await contextFactory(),
-    //     variableValues: requestContext.request.variables,
-    //     operationName: requestContext.operationName,
-    //   });
-    // },
     csrfPrevention: true,
     introspection: true,
-    cache: "bounded",
+    cache: new InMemoryLRUCache({
+      maxSize: Math.pow(2, 20) * 100,
+      ttl: 300_000,
+    }),
     plugins: [
       ApolloServerPluginDrainHttpServer({ httpServer }),
       {
@@ -113,7 +108,10 @@ const main = async () => {
 
   await apolloServer.start();
 
-  apolloServer.applyMiddleware({ app, cors: false, path: "/graphql" });
+  apolloServer.applyMiddleware({
+    app,
+    cors: corsOptions,
+  });
 
   await new Promise((resolve) => httpServer.listen({ port }, resolve as any));
 
