@@ -25,7 +25,11 @@ import cors from "cors";
 import { context } from "./context/typeGraphQLContext";
 
 const corsOptions = {
-  origin: [process.env.CLIENT_URL as string, "http://localhost:3000"],
+  origin: [
+    process.env.CLIENT_URL as string,
+    "https://studio.apollographql.com",
+    "http://localhost:3000",
+  ],
   credentials: true,
 };
 

@@ -8,9 +8,12 @@ type Query {
   getBlogBySlug(slug: String!): Blog!
   searchBlogs(query: String!): [Blog!]!
   getRelatedBlogs(limit: Float, tagIds: [String!]!, catIds: [String!]!, slug: String!): [Blog!]!
+  getUserBlogs(userId: String!): [Blog!]!
+  getBlogsByUsername(username: String!): [Blog!]!
   getCatBlogs(slug: String!): [Blog!]!
   hello: String!
   currentUser: User
+  listTags: [Tag!]!
   getTagBlogs(slug: String!): [Blog!]!
 }
 
@@ -45,9 +48,16 @@ type User {
   about: String
   role: String!
   photo: String
+  createdAt: DateTime!
+  updatedAt: DateTime!
   resetPasswordLink: String
   commented: [Comment!]!
 }
+
+"""
+The javascript `Date` as string. Type represents date and time as the ISO Date string.
+"""
+scalar DateTime
 
 type Comment {
   _id: ObjectId!
@@ -57,11 +67,6 @@ type Comment {
   createdAt: DateTime!
   updatedAt: DateTime!
 }
-
-"""
-The javascript `Date` as string. Type represents date and time as the ISO Date string.
-"""
-scalar DateTime
 
 type Category {
   _id: ObjectId!
@@ -76,9 +81,10 @@ type Tag {
 }
 
 type Mutation {
-  register(password: String!, email: String!, name: String!): Boolean!
+  register(password: String!, email: String!, name: String!): String!
   login(password: String!, email: String!): LoginResponse!
   createBlog(blog: BlogInput!): Blog!
+  newTag(tagName: String!): Boolean!
 }
 
 type LoginResponse {

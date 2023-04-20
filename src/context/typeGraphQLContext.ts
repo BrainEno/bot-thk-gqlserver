@@ -11,9 +11,12 @@ export const context = async (context: TContext) => {
 
   const { req, res } = context;
 
-  const token = req.headers["cookie"]
-    ? req.headers["cookie"].split("=")[1]
-    : "";
+  let token = "";
+  if (req.headers["cookie"]) {
+    token = req.headers["cookie"].split("=")[1];
+  } else if (req.headers["authorization"]) {
+    token = req.headers["authorization"].split(" ")[1];
+  }
 
   const user = jwt.decode(token) as UserPayload;
 
