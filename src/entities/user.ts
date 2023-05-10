@@ -1,11 +1,12 @@
-import { prop, Ref } from "@typegoose/typegoose";
-import { Exclude } from "class-transformer";
-import { IsEmail, Length, MaxLength, MinLength } from "class-validator";
-import crypto from "crypto";
-import { ObjectId } from "bson";
-import { Field, ObjectType } from "type-graphql";
-import { Comment } from "./comment";
-import { ObjectId as ObjectID } from "mongoose";
+import { DocumentType, prop, Ref } from '@typegoose/typegoose';
+import { Exclude, Expose } from 'class-transformer';
+import { IsEmail, Length, MaxLength, MinLength } from 'class-validator';
+import crypto from 'crypto';
+import { ObjectId } from 'bson';
+import { Field, ObjectType } from 'type-graphql';
+import { Comment } from './comment';
+import { ObjectId as ObjectID } from 'mongoose';
+
 
 @ObjectType()
 export class User {
@@ -21,13 +22,13 @@ export class User {
     index: true,
     lowercase: true,
   })
-  @MinLength(1, { message: "用户名不能为空" })
+  @MinLength(1, { message: '用户名不能为空' })
   @Field({ nullable: false })
   username: string;
 
   @prop({ type: () => String, trim: true, required: true, maxlength: 32 })
   @Field({ nullable: false })
-  @MinLength(1, { message: "用户名不得为空" })
+  @MinLength(1, { message: '用户名不得为空' })
   @MaxLength(32)
   name: string;
 
@@ -41,7 +42,7 @@ export class User {
   })
   @Field()
   @IsEmail()
-  @Length(1, 50, { message: "邮箱地址不能为空" })
+  @Length(1, 50, { message: '邮箱地址不能为空' })
   email: string;
 
   @prop({ type: () => String, required: true })
@@ -59,17 +60,17 @@ export class User {
   @Field({ nullable: true })
   about?: string;
 
-  @prop({ nullable: false, default: "0", trim: true })
+  @prop({ nullable: false, default: '0', trim: true })
   @Field()
   role: string;
 
   @prop({
     default:
-      "https://res.cloudinary.com/hapmoniym/image/upload/v1608712074/icons/avatar_w5us1g.png",
+      'https://res.cloudinary.com/hapmoniym/image/upload/v1608712074/icons/avatar_w5us1g.png',
   })
   @Field({
     defaultValue:
-      "https://res.cloudinary.com/hapmoniym/image/upload/v1608712074/icons/avatar_w5us1g.png",
+      'https://res.cloudinary.com/hapmoniym/image/upload/v1608712074/icons/avatar_w5us1g.png',
   })
   photo: string;
 
@@ -79,16 +80,16 @@ export class User {
   @Field(() => Date)
   updatedAt?: Date;
 
-  @prop({ default: "" })
-  @Field({ defaultValue: "" })
+  @prop({ default: '' })
+  @Field({ defaultValue: '' })
   resetPasswordLink: string;
 
-  @prop()
-  _password: string;
-
-  @prop({ ref: "Comment" })
+  @prop({ ref: 'Comment' })
   @Field(() => [Comment])
   commented: Ref<Comment>[];
+
+  @Expose()
+  _password: string;
 
   public set password(pw: string) {
     this._password = pw;
@@ -100,23 +101,33 @@ export class User {
     return this._password;
   }
 
-  authenticate(plainText: string): boolean {
+  public async updatePassword(
+    this: DocumentType<User>,
+    newPass: string
+  ): Promise<void> {
+    this._password = newPass;
+    this.salt = this.makeSalt();
+    this.hashed_password = this.encryptPassword(newPass);
+    await this.save();
+  }
+
+  public authenticate(plainText: string): boolean {
     return this.encryptPassword(plainText) === this.hashed_password;
   }
 
-  makeSalt() {
-    return Math.round(new Date().valueOf() * Math.random()) + "";
+  public makeSalt() {
+    return Math.round(new Date().valueOf() * Math.random()) + '';
   }
 
-  encryptPassword(password: string) {
-    if (!password) return "";
+  public encryptPassword(password: string) {
+    if (!password) return '';
     try {
       return crypto
-        .createHmac("sha1", this.salt)
+        .createHmac('sha1', this.salt)
         .update(password)
-        .digest("hex");
+        .digest('hex');
     } catch (error) {
-      return "";
+      return '';
     }
   }
 }

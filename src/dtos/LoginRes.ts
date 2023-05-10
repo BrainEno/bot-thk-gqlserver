@@ -2,7 +2,7 @@ import { Field,  ObjectType } from 'type-graphql'
 
 
 @ObjectType()
-export class LoginResponse {
+export class LoginRes {
     @Field()
     accessToken: string
 }

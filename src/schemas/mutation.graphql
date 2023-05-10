@@ -8,6 +8,20 @@ mutation Login($password: String!, $email: String!) {
   }
 }
 
+mutation CreateBlog($blogInput: BlogInput!, $tagIds: [String!]) {
+  createBlog(blogInput: $blogInput, tagIds: $tagIds) {
+    success
+  }
+}
+
 # mutation Logout {
 #   logout
 # }
+
+mutation EditProfile($about: String, $name: String, $photo: String, $email: String) {
+  editProfile(about: $about, name: $name, photo: $photo, email: $email)
+}
+
+mutation ResetPassword($password: String!, $username: String!) {
+  resetPassword(password: $password, username: $username)
+}
