@@ -83,6 +83,7 @@ type Tag {
 type Mutation {
   register(password: String!, email: String!, name: String!): String!
   login(password: String!, email: String!): LoginRes!
+  forgotPassword(email: String!): String!
   resetPassword(password: String!, username: String!): Boolean!
   createBlog(tagIds: [String!], blogInput: BlogInput!): NewBlogRes!
   editProfile(about: String, photo: String, email: String, name: String): Boolean!
@@ -99,7 +100,6 @@ type NewBlogRes {
 
 input BlogInput {
   title: String!
-  description: String
   body: String!
   imageUri: String = "https://res.cloudinary.com/hapmoniym/image/upload/v1644331126/bot-thk/no-image_eaeuge.jpg"
   active: Boolean!

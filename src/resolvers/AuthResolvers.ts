@@ -1,5 +1,5 @@
 import { ApolloError } from 'apollo-server-errors';
-import { isEmpty } from 'class-validator';
+import { isEmail, isEmpty } from 'class-validator';
 import dotenv from 'dotenv';
 import jwt from 'jsonwebtoken';
 import path from 'path';
@@ -10,6 +10,7 @@ import { TContext } from '../types';
 import { Service } from 'typedi';
 import { LoginRes } from '../dtos/LoginRes';
 import { UserModel } from '../models';
+import sgMail from '@sendgrid/mail';
 
 dotenv.config({ path: path.join(__dirname, '../.env.local') });
 
@@ -111,6 +112,26 @@ class AuthResolvers {
     }
   }
 
+  @Mutation(() => String)
+  async forgotPassword(@Arg('email') email: string) {
+    const user = await UserModel.findOne({ email });
+    if (!user) throw new Error('User not found');
+
+    const token = jwt.sign({ _id: user._id }, process.env.JWT_RESET_PASSWORD, {
+      expiresIn: '10m',
+    });
+    try {
+      const emailData = genEmailData(email, token);
+      await sgMail.send(emailData);
+      return `邮件已发送给${email}。请跟随指引重置您的密码，链接10分钟内有效。`;
+    } catch (error) {
+      if (user && isEmail(email)) {
+        return `${process.env.CLIENT_URL}/auth/password/reset/${token}`;
+      }
+      return error;
+    }
+  }
+
   @Mutation(() => Boolean)
   async resetPassword(
     @Ctx() { user }: TContext,
@@ -139,3 +160,45 @@ class AuthResolvers {
 }
 
 export default AuthResolvers;
+
+export const genEmailData = (email: string, token: string) => ({
+  from: {
+    name: 'BOT THK',
+    email: process.env.EMAIL_FROM as string,
+  },
+  to: email,
+  subject: `重置密码`,
+  html: `
+<body>
+<div 
+  style="
+  padding:25px;
+  background:#F7F7F7;
+">
+    <h3 
+    style="background:black;
+    color:white;
+    margin:15px auto;
+    width:max-content;
+    align-text:center;
+    padding:15px;">
+    BOT THK
+    </h3>
+    <h4 style="text-align:center;">忘记了密码？ 请点击下方链接重新设置密码</h4>
+    <br/>
+    <a 
+    style="width:600px;
+    text-decoration:underline;
+    color:#0061D5;
+    text-align:center;"
+    href="${process.env.CLIENT_URL}/auth/password/reset/${token}"
+    >   ${process.env.CLIENT_URL}/auth/password/reset/${token}
+    </a>
+    <br/>
+    <p style="text-align:center">—— 邮件发送自BTN THK ，独立创作平台 ——</p>
+    <p style='font-size:18px;text-decoration:underline;
+text-align:center;'>https://bot-thk.vercel.app</p>
+</div>
+<body>
+      `,
+});

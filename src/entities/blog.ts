@@ -25,7 +25,7 @@ export class Blog extends TimeStamps {
   @MinLength(1, { message: '标题不得为空' })
   title: string;
 
-  @prop({ type: () => String, unique: true, index: true })
+  @prop({ type: () => String})
   @Field()
   slug: string;
 
@@ -90,9 +90,6 @@ export class BlogInput {
   @Field()
   @MinLength(1, { message: '标题不得为空' })
   title: string;
-
-  @Field({ nullable: true })
-  description?: string;
 
   @Field({ nullable: false })
   @MinLength(50)

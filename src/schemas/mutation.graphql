@@ -1,5 +1,13 @@
-mutation Register($registerPassword: String!, $registerEmail: String!, $registerName: String!) {
-  register(password: $registerPassword, email: $registerEmail, name: $registerName)
+mutation Register(
+  $registerPassword: String!
+  $registerEmail: String!
+  $registerName: String!
+) {
+  register(
+    password: $registerPassword
+    email: $registerEmail
+    name: $registerName
+  )
 }
 
 mutation Login($password: String!, $email: String!) {
@@ -18,10 +26,19 @@ mutation CreateBlog($blogInput: BlogInput!, $tagIds: [String!]) {
 #   logout
 # }
 
-mutation EditProfile($about: String, $name: String, $photo: String, $email: String) {
+mutation EditProfile(
+  $about: String
+  $name: String
+  $photo: String
+  $email: String
+) {
   editProfile(about: $about, name: $name, photo: $photo, email: $email)
 }
 
 mutation ResetPassword($password: String!, $username: String!) {
   resetPassword(password: $password, username: $username)
+}
+
+mutation ForgotPassword($email: String!) {
+  forgotPassword(email: $email)
 }

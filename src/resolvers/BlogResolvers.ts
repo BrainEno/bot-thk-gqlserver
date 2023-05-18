@@ -187,9 +187,7 @@ class BlogResolvers {
 
     const { body, title, imageUri, active } = blogInput;
 
-    const description = blogInput.description
-      ? blogInput.description
-      : smartTrim(blogInput.body, 55, ' ', '...');
+    const description = smartTrim(blogInput.body, 55, ' ', '...');
 
     const mtitle = `${title} | ${process.env.SITE_NAME ?? 'BOT THK'}`;
     const defaultTag = await TagModel.findOne({

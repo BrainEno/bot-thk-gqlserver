@@ -1,34 +1,35 @@
-import "reflect-metadata";
+import 'reflect-metadata';
 
-import { ApolloServerPluginDrainHttpServer } from "apollo-server-core";
-import { ApolloServer } from "apollo-server-express";
-import dotenv from "dotenv";
-import express from "express";
-import http from "http";
-import mongoose from "mongoose";
-import { InMemoryLRUCache } from "@apollo/utils.keyvaluecache";
+import { ApolloServerPluginDrainHttpServer } from 'apollo-server-core';
+import { ApolloServer } from 'apollo-server-express';
+import dotenv from 'dotenv';
+import express from 'express';
+import http from 'http';
+import mongoose from 'mongoose';
+import { InMemoryLRUCache } from '@apollo/utils.keyvaluecache';
 
-import { createSchema } from "./utils/createSchema";
+import { createSchema } from './utils/createSchema';
 import {
   ApolloServerPlugin,
   GraphQLRequestContext,
-} from "apollo-server-plugin-base";
-import Container, { ContainerInstance } from "typedi";
+} from 'apollo-server-plugin-base';
+import Container, { ContainerInstance } from 'typedi';
 import {
   getComplexity,
   simpleEstimator,
   fieldExtensionsEstimator,
-} from "graphql-query-complexity";
-import cookieParser from "cookie-parser";
-import { TContext } from "./types";
-import cors from "cors";
-import { context } from "./context/typeGraphQLContext";
+} from 'graphql-query-complexity';
+import cookieParser from 'cookie-parser';
+import { TContext } from './types';
+import cors from 'cors';
+import { context } from './context/typeGraphQLContext';
 
 const corsOptions = {
   origin: [
     process.env.CLIENT_URL as string,
-    "https://studio.apollographql.com",
-    "http://localhost:3000",
+    'https://studio.apollographql.com',
+    'https://sendgrid.com',
+    'http://localhost:3000',
   ],
   credentials: true,
 };
@@ -41,10 +42,10 @@ const main = async () => {
   app.use(cookieParser());
   app.use(cors(corsOptions));
 
-  app.get("/", (_req, res) => {
+  app.get('/', (_req, res) => {
     const data = {
       uptime: process.uptime(),
-      message: "OK",
+      message: 'OK',
       date: new Date(),
     };
     res.status(200).send(data);
@@ -55,9 +56,9 @@ const main = async () => {
   try {
     mongoose
       .connect(process.env.MONGODB_URI!)
-      .then(() => console.log("***MongoDB connected***"));
+      .then(() => console.log('***MongoDB connected***'));
   } catch (error) {
-    console.log("Error connecting to MongoDB:", error?.message);
+    console.log('Error connecting to MongoDB:', error?.message);
   }
 
   const schema = createSchema();
@@ -95,7 +96,7 @@ const main = async () => {
                 `Sorry, too complicated query! ${complexity} is over 35 that is the max allowed complexity.`
               );
             }
-            console.log("Used query complexity points:", complexity);
+            console.log('Used query complexity points:', complexity);
           },
           willSendResponse(requestContext: GraphQLRequestContext<TContext>) {
             Container.reset(requestContext.context.requestId.toString());
@@ -103,7 +104,7 @@ const main = async () => {
             const instancesIds = (
               (Container as any).instances as ContainerInstance[]
             ).map((instance) => instance.id);
-            console.log("instances left in memory:", instancesIds);
+            console.log('instances left in memory:', instancesIds);
           },
         }),
       },
