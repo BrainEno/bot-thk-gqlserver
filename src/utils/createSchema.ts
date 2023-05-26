@@ -7,7 +7,6 @@ import AuthResolvers from "../resolvers/AuthResolvers";
 import BlogResolvers from "../resolvers/BlogResolvers";
 import CatResolvers from "../resolvers/CatResolvers";
 import UserResolvers from "../resolvers/UserResolvers";
-// import { TypegooseMiddleware } from "../middlewares/TypegooseMiddleware";
 import { ObjectId } from "mongodb";
 import { ObjectIdScalar } from "./ObjectIdScalar";
 import TagResolvers from "../resolvers/TagResolvers";

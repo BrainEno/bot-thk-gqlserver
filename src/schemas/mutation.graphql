@@ -42,3 +42,19 @@ mutation ResetPassword($password: String!, $username: String!) {
 mutation ForgotPassword($email: String!) {
   forgotPassword(email: $email)
 }
+
+mutation DeleteTag($deleteTagId: String!) {
+  deleteTag(id: $deleteTagId)
+}
+
+mutation NewTag($tagName: String!) {
+  newTag(tagName: $tagName)
+}
+
+mutation NewCat($catName: String!) {
+  newCat(catName: $catName)
+}
+
+mutation DeleteCat($deleteCatId: String!) {
+  deleteCat(id: $deleteCatId)
+}

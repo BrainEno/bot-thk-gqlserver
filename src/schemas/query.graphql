@@ -191,3 +191,11 @@ query ListTags {
     _id
   }
 }
+
+query ListCats {
+  listCats {
+    name
+    _id
+    slug
+  }
+}

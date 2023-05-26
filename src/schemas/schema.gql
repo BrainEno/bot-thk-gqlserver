@@ -10,6 +10,7 @@ type Query {
   getRelatedBlogs(limit: Float, tagIds: [String!]!, catIds: [String!]!, slug: String!): [Blog!]!
   getUserBlogs(userId: String!): [Blog!]!
   getBlogsByUsername(username: String!): [Blog!]!
+  listCats: [Category!]!
   getCatBlogs(slug: String!): [Blog!]!
   hello: String!
   currentUser: User
@@ -86,8 +87,11 @@ type Mutation {
   forgotPassword(email: String!): String!
   resetPassword(password: String!, username: String!): Boolean!
   createBlog(tagIds: [String!], blogInput: BlogInput!): NewBlogRes!
+  newCat(catName: String!): Boolean!
+  deleteCat(id: String!): Boolean!
   editProfile(about: String, photo: String, email: String, name: String): Boolean!
   newTag(tagName: String!): Boolean!
+  deleteTag(id: String!): Boolean!
 }
 
 type LoginRes {
