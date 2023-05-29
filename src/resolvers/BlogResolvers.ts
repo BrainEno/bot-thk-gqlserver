@@ -9,6 +9,7 @@ import { smartTrim } from '../utils/smartTrim';
 import { NewBlogRes } from '../dtos/NewBlogRes';
 import { Service } from 'typedi';
 import { slugify } from '../utils/slugify';
+import mongoose from 'mongoose';
 
 @Service()
 @Resolver()
@@ -200,7 +201,9 @@ class BlogResolvers {
 
     const tags = tagIds ? tagIds : [defaultTag?._id];
     const categories = [defaultCat?._id];
-    const slug = slugify(title);
+    let slug = slugify(title);
+    const slugExist = await BlogModel.findOne({ slug });
+    if (!!slugExist) slug += '(1)';
 
     try {
       const newBlog = new BlogModel({
@@ -223,6 +226,66 @@ class BlogResolvers {
       return { success: false, blog: null };
     }
   }
+
+  @Mutation(() => NewBlogRes)
+  async updateBlog(
+    @Ctx() { user }: TContext,
+    @Arg('blogId') blogId: string,
+    @Arg('blogInput') blogInput: BlogInput,
+    @Arg('tagIds', () => [String], { nullable: true }) tagIds?: string[]
+  ): Promise<NewBlogRes> {
+    if (!user) throw new Error('当前用户信息不可用，请重新登录');
+
+    if (!blogInput) throw new Error('缺少必要信息，完善后重新提交');
+
+    const prevBlog = await BlogModel.findOne({
+      _id: blogId,
+    });
+
+    if (!prevBlog) throw new Error('加载草稿错误');
+
+    const { body, title, imageUri, active } = blogInput;
+
+    const description = smartTrim(
+      blogInput.body ? blogInput.body : prevBlog.body,
+      55,
+      ' ',
+      '...'
+    );
+
+    const mtitle = `${title || prevBlog.title} | ${
+      process.env.SITE_NAME ?? 'BOT THK'
+    }`;
+
+    const defaultTag = await TagModel.findOne({
+      name: 'else',
+    });
+
+    const tags = tagIds ? strToRef(tagIds) : [defaultTag!._id!];
+    let slug = slugify(title || prevBlog.title);
+    const slugExist = await BlogModel.findOne({ slug });
+    if (slugExist && slugExist._id.toString() !== blogId) slug += '(1)';
+
+    prevBlog;
+    try {
+      if (title) prevBlog.title = title;
+      if (body) prevBlog.body = body;
+      if (imageUri) prevBlog.imageUri = imageUri;
+      if (active !== prevBlog.active) prevBlog.active = active;
+      if (tags) prevBlog.tags = tags as any;
+      if (slug) prevBlog.slug = slug;
+      if (mtitle) prevBlog.mtitle = mtitle;
+      if (description) prevBlog.description = description;
+      const newBlog = await prevBlog.save();
+      return { success: true, blog: newBlog };
+    } catch (error) {
+      console.log(error);
+      return { success: false, blog: null };
+    }
+  }
 }
+
+const strToRef = (ids: string[]) =>
+  ids.map((id) => new mongoose.Types.ObjectId(id));
 
 export default BlogResolvers;

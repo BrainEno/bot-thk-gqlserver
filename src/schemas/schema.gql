@@ -87,6 +87,7 @@ type Mutation {
   forgotPassword(email: String!): String!
   resetPassword(password: String!, username: String!): Boolean!
   createBlog(tagIds: [String!], blogInput: BlogInput!): NewBlogRes!
+  updateBlog(tagIds: [String!], blogInput: BlogInput!, blogId: String!): NewBlogRes!
   newCat(catName: String!): Boolean!
   deleteCat(id: String!): Boolean!
   editProfile(about: String, photo: String, email: String, name: String): Boolean!
