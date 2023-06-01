@@ -199,3 +199,31 @@ query ListCats {
     slug
   }
 }
+
+query GetBlogById($blogId: String!) {
+  getBlogById(blogId: $blogId) {
+    _id
+    active
+    author {
+      name
+    }
+    body
+    categories {
+      _id
+      name
+      slug
+    }
+    createdAt
+    description
+    imageUri
+    slug
+    tags {
+      name
+      slug
+      _id
+    }
+    title
+    updatedAt
+    mtitle
+  }
+}

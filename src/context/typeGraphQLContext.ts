@@ -1,7 +1,7 @@
-import jwt from "jsonwebtoken";
-import Container from "typedi";
+import jwt from 'jsonwebtoken';
+import Container from 'typedi';
 
-import { TContext, UserPayload } from "../types";
+import { TContext, UserPayload } from '../types';
 
 export const context = async (context: TContext) => {
   const requestId = Math.floor(
@@ -11,11 +11,11 @@ export const context = async (context: TContext) => {
 
   const { req, res } = context;
 
-  let token = "";
-  if (req.headers["cookie"]) {
-    token = req.headers["cookie"].split("=")[1];
-  } else if (req.headers["authorization"]) {
-    token = req.headers["authorization"].split(" ")[1];
+  let token = '';
+  if (req.headers['cookie']) {
+    token = req.headers['cookie'].split('token=')[1];
+  } else if (req.headers['authorization']) {
+    token = req.headers['authorization'].split(' ')[1];
   }
 
   const user = jwt.decode(token) as UserPayload;
@@ -26,6 +26,6 @@ export const context = async (context: TContext) => {
     requestId,
     container,
   };
-  container.set("context", typeGraphQLContext);
+  container.set('context', typeGraphQLContext);
   return { ...typeGraphQLContext, res };
 };

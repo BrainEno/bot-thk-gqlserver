@@ -65,6 +65,34 @@ class BlogResolvers {
     }
   }
 
+  /**
+   * get a blog by it's id
+   * @param blogId
+   * @returns
+   */
+  @Query(() => Blog)
+  async getBlogById(@Arg('blogId') blogId: string): Promise<Blog> {
+    try {
+      if (isEmpty(blogId)) {
+        throw new UserInputError('blogId can not be null');
+      }
+      const blog = await BlogModel.findOne({ _id:blogId })
+        .populate('categories', '_id name slug')
+        .populate('tags', '_id name slug')
+        .populate('author', '_id name username')
+        .sort({ createdAt: -1 })
+        .select(
+          '_id title mtitle author body image imageUri slug description categories tags createdAt updatedAt active'
+        )
+        .exec();
+      if (!blog) throw new Error(`not found blog with id ${blogId}`);
+      return blog;
+    } catch (err) {
+      console.log(err);
+      throw err;
+    }
+  }
+
   @Query(() => [Blog])
   async searchBlogs(@Arg('query') query: string): Promise<Blog[]> {
     try {
