@@ -76,7 +76,7 @@ class BlogResolvers {
       if (isEmpty(blogId)) {
         throw new UserInputError('blogId can not be null');
       }
-      const blog = await BlogModel.findOne({ _id:blogId })
+      const blog = await BlogModel.findOne({ _id: blogId })
         .populate('categories', '_id name slug')
         .populate('tags', '_id name slug')
         .populate('author', '_id name username')
@@ -310,6 +310,16 @@ class BlogResolvers {
       console.log(error);
       return { success: false, blog: null };
     }
+  }
+
+  @Mutation(() => Boolean)
+  async deleteBlogById(
+    @Ctx() { user }: TContext,
+    @Arg('blogId') blogId: string
+  ) {
+    if (!user) throw new Error('当前用户信息不可用，请重新登录');
+    const res = await BlogModel.findOneAndDelete({ _id: blogId });
+    return res !== null;
   }
 }
 

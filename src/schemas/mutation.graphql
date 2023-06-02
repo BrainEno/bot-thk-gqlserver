@@ -59,8 +59,16 @@ mutation DeleteCat($deleteCatId: String!) {
   deleteCat(id: $deleteCatId)
 }
 
-mutation UpdateBlog($blogInput: BlogInput!, $blogId: String!, $tagIds: [String!]) {
+mutation UpdateBlog(
+  $blogInput: BlogInput!
+  $blogId: String!
+  $tagIds: [String!]
+) {
   updateBlog(blogInput: $blogInput, blogId: $blogId, tagIds: $tagIds) {
     success
   }
+}
+
+mutation DeleteBlogById($blogId: String!) {
+  deleteBlogById(blogId: $blogId)
 }
