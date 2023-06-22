@@ -24,18 +24,18 @@ import { TContext } from './types';
 import cors from 'cors';
 import { context } from './context/typeGraphQLContext';
 
+dotenv.config();
+
 const corsOptions = {
   origin: [
     process.env.CLIENT_URL as string,
     'https://studio.apollographql.com',
     'https://sendgrid.com',
-    'http://localhost:3000',
   ],
   credentials: true,
 };
 
 const main = async () => {
-  dotenv.config();
   const port = parseInt(process.env.PORT!, 10) || 4001;
   const app = express();
 
@@ -116,6 +116,7 @@ const main = async () => {
   apolloServer.applyMiddleware({
     app,
     cors: corsOptions,
+    path: '/graphql',
   });
 
   await new Promise((resolve) => httpServer.listen({ port }, resolve as any));
