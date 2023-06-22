@@ -190,6 +190,7 @@ class BlogResolvers {
         .populate('tags', 'name slug')
         .populate('author', 'name')
         .select('slug title author imageUri createdAt description')
+        .sort({ createdAt: 1 })
         .exec();
       if (!blogs) throw new Error(`not found blogs belongs to user: ${userId}`);
       return blogs;
@@ -227,7 +228,7 @@ class BlogResolvers {
       name: 'Recent Post',
     });
 
-    const tags = tagIds ? tagIds : [defaultTag?._id];
+    const tags = tagIds && tagIds?.length ? strToRef(tagIds) : [defaultTag?._id];
     const categories = [defaultCat?._id];
     let slug = slugify(title);
     const slugExist = await BlogModel.findOne({ slug });
@@ -289,7 +290,7 @@ class BlogResolvers {
       name: 'else',
     });
 
-    const tags = tagIds ? strToRef(tagIds) : [defaultTag!._id!];
+    const tags = tagIds&&tagIds?.length ? strToRef(tagIds) : [defaultTag!._id!];
     let slug = slugify(title || prevBlog.title);
     const slugExist = await BlogModel.findOne({ slug });
     if (slugExist && slugExist._id.toString() !== blogId) slug += '(1)';
