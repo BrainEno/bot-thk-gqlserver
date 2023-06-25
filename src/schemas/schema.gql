@@ -84,7 +84,7 @@ type Tag {
 
 type Mutation {
   register(password: String!, email: String!, name: String!): String!
-  login(password: String!, email: String!): LoginRes!
+  login(password: String!, email: String!): Boolean!
   forgotPassword(email: String!): String!
   resetPassword(password: String!, username: String!): Boolean!
   createBlog(tagIds: [String!], blogInput: BlogInput!): NewBlogRes!
@@ -95,10 +95,6 @@ type Mutation {
   editProfile(about: String, photo: String, email: String, name: String): Boolean!
   newTag(tagName: String!): Boolean!
   deleteTag(id: String!): Boolean!
-}
-
-type LoginRes {
-  accessToken: String!
 }
 
 type NewBlogRes {

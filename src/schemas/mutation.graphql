@@ -11,9 +11,7 @@ mutation Register(
 }
 
 mutation Login($password: String!, $email: String!) {
-  login(password: $password, email: $email) {
-    accessToken
-  }
+  login(password: $password, email: $email)
 }
 
 mutation CreateBlog($blogInput: BlogInput!, $tagIds: [String!]) {

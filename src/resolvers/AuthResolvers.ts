@@ -8,7 +8,6 @@ import { Arg, Ctx, Mutation, Resolver } from 'type-graphql';
 
 import { TContext } from '../types';
 import { Service } from 'typedi';
-import { LoginRes } from '../dtos/LoginRes';
 import { UserModel } from '../models';
 import sgMail from '@sendgrid/mail';
 
@@ -78,12 +77,12 @@ class AuthResolvers {
     }
   }
 
-  @Mutation(() => LoginRes)
+  @Mutation(()=>Boolean)
   async login(
     @Arg('email') email: string,
     @Arg('password') password: string,
     @Ctx() context: TContext
-  ): Promise<LoginRes> {
+  ): Promise<boolean> {
     try {
       if (isEmpty(email)) throw new EmailError('邮箱不得为空');
       if (isEmpty(password)) throw new PasswordError('密码不得为空');
@@ -100,15 +99,14 @@ class AuthResolvers {
         { expiresIn: '7d' }
       );
 
-      context.res.cookie('token', token, {
+      context.res.cookie('botthk', token, {
         httpOnly: true,
         maxAge: 1000 * 60 * 60 * 24 * 7,
       });
-
-      return { accessToken: token };
+      return true;
     } catch (error) {
       console.log(error);
-      return { accessToken: '' };
+      return false;
     }
   }
 
