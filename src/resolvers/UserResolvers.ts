@@ -1,4 +1,14 @@
-import { Arg, Ctx, Mutation, Query, Resolver } from 'type-graphql';
+import {
+  Arg,
+  Ctx,
+  Mutation,
+  Publisher,
+  PubSub,
+  Query,
+  Resolver,
+  Root,
+  Subscription,
+} from 'type-graphql';
 
 import { User } from '../entities/user';
 import { TContext } from '../types';
@@ -6,6 +16,8 @@ import { Service } from 'typedi';
 import { UserModel } from '../models';
 import { AuthenticationError } from 'apollo-server-express';
 import { isEmail, isEmpty } from 'class-validator';
+import { Topic } from '../topic';
+import { NewFollowerPayload } from '../interfaces/newFollower.interface';
 
 @Service()
 @Resolver()
@@ -26,6 +38,141 @@ class UserResolvers {
     }
   }
 
+  @Query(() => [User], { nullable: true })
+  async searchUsers(@Ctx() { user }: TContext, @Arg('name') name: string) {
+    if (user === null) throw new AuthenticationError('please login');
+
+    try {
+      const users = await UserModel.find({
+        name,
+        $options: 'i',
+      })
+        .select('name email profile about photo')
+        .exec();
+
+      if (!users) throw new Error(`users not found`);
+      return users;
+    } catch (err) {
+      throw err;
+    }
+  }
+
+  @Mutation(() => Boolean)
+  async follow(
+    @Ctx() context: TContext,
+    @Arg('followName') followName: string,
+    @PubSub(Topic.NewFollower)
+    notifyAboutNewFollower: Publisher<NewFollowerPayload>
+  ) {
+    if (isEmpty(followName)) throw new Error('该用户不存在');
+    try {
+      if (context.user === null)
+        throw new AuthenticationError('not authenticated');
+      const curUser = await UserModel.findOne({ _id: context.user._id });
+      if (!curUser) throw new AuthenticationError('please login');
+
+      const toFollow = await UserModel.findOne({ name: followName });
+
+      if (!toFollow) throw new Error('该用户不存在或已注销');
+      if (context.user._id === toFollow._id)
+        throw new AuthenticationError('不能关注自己');
+
+      if (!curUser.followings) curUser.followings = [];
+      if (!toFollow.followers) toFollow.followers = [];
+
+      if (
+        !curUser.followings
+          .map((u) => u._id.toString())
+          .includes(toFollow._id.toString()) &&
+        !toFollow.followers
+          .map((u) => u._id.toString())
+          .includes(curUser._id.toString())
+      ) {
+        curUser.followings.push(toFollow);
+        toFollow.followers.push(curUser);
+
+        await curUser.populate('followers');
+        await curUser.populate('followings');
+        await toFollow.populate('followers');
+        await toFollow.populate('followings');
+
+        curUser.addFollowingId(toFollow.id.toString());
+        toFollow.addFollowerId(curUser.id.toString());
+
+        const payload = {
+          followerId: curUser._id.toString(),
+          dateString: new Date().toISOString(),
+          followerName: curUser.name,
+          followedName: toFollow.name,
+        };
+
+        await notifyAboutNewFollower(payload);
+
+        await curUser.save();
+        await toFollow.save();
+
+        return true;
+      } else {
+        throw Error('already followed this user');
+      }
+    } catch (err) {
+      console.log(err);
+      return false;
+    }
+  }
+
+  @Mutation(() => Boolean)
+  async unFollow(@Ctx() context: TContext, @Arg('name') name: string) {
+    if (isEmpty(name)) throw new Error('user not found');
+    try {
+      if (context.user === null)
+        throw new AuthenticationError('not authenticated');
+      const curUser = await UserModel.findOne({ _id: context.user._id });
+      if (!curUser) throw new AuthenticationError('please login');
+
+      const unFollow = await UserModel.findOne({ name });
+
+      if (!unFollow) throw new Error('该用户不存在或已注销');
+      if (context.user._id === unFollow._id)
+        throw new Error('illegal operation');
+
+      if (!curUser.followings || !unFollow.followers) return;
+
+      if (
+        curUser.followings
+          .map((f) => f._id.toString())
+          .includes(unFollow._id.toString()) &&
+        unFollow.followers
+          .map((f) => f._id.toString())
+          .includes(curUser._id.toString())
+      ) {
+        curUser.followings = curUser.followings.filter(
+          (u) => u._id.toString() !== unFollow._id.toString()
+        );
+        unFollow.followers = unFollow.followers.filter(
+          (u) => u._id.toString() !== curUser._id.toString()
+        );
+
+        await curUser.populate('followers');
+        await curUser.populate('followings');
+        await unFollow.populate('followers');
+        await unFollow.populate('followings');
+
+        curUser.removeFollowingId(unFollow.id.toString());
+        unFollow.removeFollowerId(curUser.id.toString());
+
+        await curUser.save();
+        await unFollow.save();
+
+        return true;
+      } else {
+        throw Error(`haven't followed this user yet`);
+      }
+    } catch (err) {
+      console.log(err);
+      return false;
+    }
+  }
 
   @Mutation(() => Boolean)
   async editProfile(
@@ -57,9 +204,23 @@ class UserResolvers {
       }
       return true;
     } catch (error) {
-      console.log(error)
+      console.log(error);
       return false;
     }
+  }
+
+  @Subscription({
+    topics: Topic.NewFollower,
+    filter: ({ payload, args }) => {
+      return payload.followedName === args.name;
+    },
+  })
+  userFollowed(
+    @Root() payload: NewFollowerPayload,
+    @Arg('name') name: string
+  ): string {
+    console.log('arg name: ',name);
+    return `${payload.followerName} followed you at ${payload.dateString}`;
   }
 }
 

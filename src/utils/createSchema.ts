@@ -1,15 +1,32 @@
-import path from "path";
-import { buildSchemaSync } from "type-graphql";
-import { Container } from "typedi";
+import path from 'path';
+import { buildSchemaSync } from 'type-graphql';
+import { Container } from 'typedi';
 
-import { authChecker } from "../middlewares/authChecker";
-import AuthResolvers from "../resolvers/AuthResolvers";
-import BlogResolvers from "../resolvers/BlogResolvers";
-import CatResolvers from "../resolvers/CatResolvers";
-import UserResolvers from "../resolvers/UserResolvers";
-import { ObjectId } from "mongodb";
-import { ObjectIdScalar } from "./ObjectIdScalar";
-import TagResolvers from "../resolvers/TagResolvers";
+import { authChecker } from '../middlewares/authChecker';
+import AuthResolvers from '../resolvers/AuthResolvers';
+import BlogResolvers from '../resolvers/BlogResolvers';
+import CatResolvers from '../resolvers/CatResolvers';
+import UserResolvers from '../resolvers/UserResolvers';
+import { ObjectId } from 'mongodb';
+import { ObjectIdScalar } from './ObjectIdScalar';
+import TagResolvers from '../resolvers/TagResolvers';
+import { RedisPubSub } from 'graphql-redis-subscriptions';
+import Redis, { RedisOptions } from 'ioredis';
+import dotenv from 'dotenv';
+
+dotenv.config();
+
+const options: RedisOptions = {
+  host: process.env.REDIS_HOST,
+  port: Number.parseInt(process.env.REDIS_PORT!),
+  password: process.env.REDIS_PASSWORD,
+  retryStrategy: (times) => Math.max(times * 100, 3000),
+};
+
+const pubSub = new RedisPubSub({
+  publisher: new Redis(options),
+  subscriber: new Redis(options),
+});
 
 export const createSchema = () =>
   buildSchemaSync({
@@ -20,13 +37,13 @@ export const createSchema = () =>
       CatResolvers,
       TagResolvers,
     ],
+    pubSub,
     authChecker: authChecker,
-    authMode: "null",
+    authMode: 'null',
     emitSchemaFile: {
-      path: path.resolve(__dirname, "../schemas/schema.gql"),
+      path: path.resolve(__dirname, '../schemas/schema.graphql'),
       sortedSchema: false,
     },
-    // globalMiddlewares: [TypegooseMiddleware],
     scalarsMap: [{ type: ObjectId, scalar: ObjectIdScalar }],
-    container: ({ context }) => Container.of(context.requestId),
+    container: Container,
   });

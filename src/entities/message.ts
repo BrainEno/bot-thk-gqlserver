@@ -5,6 +5,7 @@ import { ObjectId as ObjectID } from "mongoose";
 import { Field, ObjectType } from "type-graphql";
 
 import { User } from "./user";
+import { Conversation } from "./conversation";
 
 @ObjectType()
 export class Message {
@@ -17,13 +18,22 @@ export class Message {
   @Max(500)
   msgContent: string;
 
-  @prop({ ref: "User" })
-  @Field(() => User)
-  form: Ref<User>;
+  @prop({ref:'Conversation'})
+  conversation:Ref<Conversation>
+
+  @prop(()=>String)
+  conversationId:string;
+
+  @prop(()=>Boolean)
+  isLatestIn:boolean;
 
   @prop({ ref: "User" })
   @Field(() => User)
-  to: Ref<User>;
+  sender: Ref<User>;
+
+  @prop({ ref: "User" })
+  @Field(() => User)
+  reciver: Ref<User>;
 
   @Field(() => Date)
   createdAt: Date;

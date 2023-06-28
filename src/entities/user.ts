@@ -1,4 +1,10 @@
-import { DocumentType, prop, Ref } from '@typegoose/typegoose';
+import {
+  DocumentType,
+  modelOptions,
+  prop,
+  Ref,
+  Severity,
+} from '@typegoose/typegoose';
 import { Exclude, Expose } from 'class-transformer';
 import { IsEmail, Length, MaxLength, MinLength } from 'class-validator';
 import crypto from 'crypto';
@@ -7,8 +13,11 @@ import { Field, ObjectType } from 'type-graphql';
 import { Comment } from './comment';
 import { ObjectId as ObjectID } from 'mongoose';
 
-
 @ObjectType()
+@modelOptions({
+  schemaOptions: { timestamps: true },
+  options: { allowMixed: Severity.ALLOW },
+})
 export class User {
   @Field(() => ObjectId)
   readonly _id: ObjectID;
@@ -88,6 +97,22 @@ export class User {
   @Field(() => [Comment])
   commented: Ref<Comment>[];
 
+  @prop({ ref: 'User' })
+  @Field(() => [User])
+  followings: Ref<User>[];
+
+  @prop({ ref: 'User' })
+  @Field(() => [User])
+  followers: Ref<User>[];
+
+  @prop(() => [String])
+  @Field(() => [String])
+  followingIds: string[];
+
+  @prop(() => [String])
+  @Field(() => [String])
+  followerIds: string[];
+
   @Expose()
   _password: string;
 
@@ -99,6 +124,52 @@ export class User {
 
   public get password() {
     return this._password;
+  }
+
+  public get followingsCount() {
+    return this.followings.length;
+  }
+
+  public get followersCount() {
+    return this.followers.length;
+  }
+
+  public async addFollowingId(
+    this: DocumentType<User>,
+    newFollowingId: string
+  ) {
+    if (!this.followingIds) this.followingIds = [];
+
+    if (!this.followingIds.includes(newFollowingId))
+      this.followingIds.push(newFollowingId);
+  }
+
+  public async removeFollowingId(
+    this: DocumentType<User>,
+    followingId: string
+  ) {
+    if (!this.followingIds) {
+      this.followingIds = [];
+    }
+
+    if (this.followingIds.includes(followingId))
+      this.followingIds = this.followingIds.filter((id) => id !== followingId);
+  }
+
+  public async addFollowerId(this: DocumentType<User>, newFollowingId: string) {
+    if (!this.followerIds) this.followerIds = [];
+
+    if (!this.followerIds.includes(newFollowingId))
+      this.followerIds.push(newFollowingId);
+  }
+
+  public async removeFollowerId(this: DocumentType<User>, followerId: string) {
+    if (!this.followerIds) {
+      this.followerIds = [];
+    }
+
+    if (this.followerIds.includes(followerId))
+      this.followerIds = this.followerIds.filter((id) => id !== followerId);
   }
 
   public async updatePassword(

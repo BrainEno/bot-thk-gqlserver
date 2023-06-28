@@ -70,3 +70,11 @@ mutation UpdateBlog(
 mutation DeleteBlogById($blogId: String!) {
   deleteBlogById(blogId: $blogId)
 }
+
+mutation Follow($followName: String!) {
+  follow(followName: $followName)
+}
+
+mutation UnFollow($name: String!) {
+  unFollow(name: $name)
+}

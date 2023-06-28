@@ -6,7 +6,7 @@ import path from 'path';
 import shortId from 'shortid';
 import { Arg, Ctx, Mutation, Resolver } from 'type-graphql';
 
-import { TContext } from '../types';
+import { TContext, UserPayload } from '../types';
 import { Service } from 'typedi';
 import { UserModel } from '../models';
 import sgMail from '@sendgrid/mail';
@@ -65,7 +65,7 @@ class AuthResolvers {
       });
 
       const token = jwt.sign(
-        { _id: user._id, role: user.role },
+        { _id: user._id, name: user.name, role: user.role } as UserPayload,
         process.env.JWT_SECRET!,
         { expiresIn: '7d' }
       ) as string;
@@ -77,7 +77,7 @@ class AuthResolvers {
     }
   }
 
-  @Mutation(()=>Boolean)
+  @Mutation(() => Boolean)
   async login(
     @Arg('email') email: string,
     @Arg('password') password: string,
@@ -102,7 +102,12 @@ class AuthResolvers {
       context.res.cookie('botthk', token, {
         httpOnly: true,
         maxAge: 1000 * 60 * 60 * 24 * 7,
+        sameSite: 'none',
+        secure: true,
       });
+
+      context.res.setHeader('authorization', `Bearer ${token}`);
+
       return true;
     } catch (error) {
       console.log(error);
@@ -115,7 +120,7 @@ class AuthResolvers {
     const user = await UserModel.findOne({ email });
     if (!user) throw new Error('User not found');
 
-    const token = jwt.sign({ _id: user._id }, process.env.JWT_RESET_PASSWORD, {
+    const token = jwt.sign({ _id: user._id }, process.env.JWT_RESET_PASSWORD!, {
       expiresIn: '10m',
     });
     try {

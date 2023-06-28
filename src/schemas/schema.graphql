@@ -6,10 +6,18 @@
 type Query {
   listBlogsWithCatTag: [Blog!]!
   getBlogBySlug(slug: String!): Blog!
+  getBlogById(blogId: String!): Blog!
+  searchBlogs(query: String!): [Blog!]!
   getRelatedBlogs(limit: Float, tagIds: [String!]!, catIds: [String!]!, slug: String!): [Blog!]!
+  getUserBlogs(userId: String!): [Blog!]!
+  getBlogsByUsername(username: String!): [Blog!]!
+  listCats: [Category!]!
   getCatBlogs(slug: String!): [Blog!]!
   hello: String!
   currentUser: User
+  searchUsers(name: String!): [User!]
+  listTags: [Tag!]!
+  getTagBlogs(slug: String!): [Blog!]!
 }
 
 type Blog {
@@ -43,9 +51,20 @@ type User {
   about: String
   role: String!
   photo: String
+  createdAt: DateTime!
+  updatedAt: DateTime!
   resetPasswordLink: String
   commented: [Comment!]!
+  followings: [User!]!
+  followers: [User!]!
+  followingIds: [String!]!
+  followerIds: [String!]!
 }
+
+"""
+The javascript `Date` as string. Type represents date and time as the ISO Date string.
+"""
+scalar DateTime
 
 type Comment {
   _id: ObjectId!
@@ -55,11 +74,6 @@ type Comment {
   createdAt: DateTime!
   updatedAt: DateTime!
 }
-
-"""
-The javascript `Date` as string. Type represents date and time as the ISO Date string.
-"""
-scalar DateTime
 
 type Category {
   _id: ObjectId!
@@ -74,20 +88,33 @@ type Tag {
 }
 
 type Mutation {
-  register(password: String!, email: String!, name: String!): Boolean!
-  login(password: String!, email: String!): LoginResponse!
-  createBlog(blog: BlogInput!): Blog!
+  register(password: String!, email: String!, name: String!): String!
+  login(password: String!, email: String!): Boolean!
+  forgotPassword(email: String!): String!
+  resetPassword(password: String!, username: String!): Boolean!
+  createBlog(tagIds: [String!], blogInput: BlogInput!): NewBlogRes!
+  updateBlog(tagIds: [String!], blogInput: BlogInput!, blogId: String!): NewBlogRes!
+  deleteBlogById(blogId: String!): Boolean!
+  newCat(catName: String!): Boolean!
+  deleteCat(id: String!): Boolean!
+  follow(followName: String!): Boolean!
+  unFollow(name: String!): Boolean!
+  editProfile(about: String, photo: String, email: String, name: String): Boolean!
+  newTag(tagName: String!): Boolean!
+  deleteTag(id: String!): Boolean!
 }
 
-type LoginResponse {
-  accessToken: String!
+type NewBlogRes {
+  success: Boolean!
 }
 
 input BlogInput {
   title: String!
-  slug: String!
-  description: String
   body: String!
   imageUri: String = "https://res.cloudinary.com/hapmoniym/image/upload/v1644331126/bot-thk/no-image_eaeuge.jpg"
   active: Boolean!
+}
+
+type Subscription {
+  userFollowed(name: String!): String!
 }
