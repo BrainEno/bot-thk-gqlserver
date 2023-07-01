@@ -27,7 +27,6 @@ type Blog {
   description: String
   body: String!
   mtitle: String!
-  image: String
   imageUri: String
   active: Boolean
   likedBy: [User!]

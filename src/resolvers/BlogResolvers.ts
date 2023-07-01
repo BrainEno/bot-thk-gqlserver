@@ -27,7 +27,7 @@ class BlogResolvers {
         .populate('author', '_id name username profile')
         .sort({ createdAt: -1 })
         .select(
-          '_id title mtitle author body image imageUri slug description categories tags createdAt updatedAt'
+          '_id title mtitle author body imageUri slug description categories tags createdAt updatedAt'
         )
         .exec();
       return blogs;
@@ -82,7 +82,7 @@ class BlogResolvers {
         .populate('author', '_id name username')
         .sort({ createdAt: -1 })
         .select(
-          '_id title mtitle author body image imageUri slug description categories tags createdAt updatedAt active'
+          '_id title mtitle author body imageUri slug description categories tags createdAt updatedAt active'
         )
         .exec();
       if (!blog) throw new Error(`not found blog with id ${blogId}`);

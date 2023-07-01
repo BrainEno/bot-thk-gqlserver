@@ -42,9 +42,6 @@ export class Blog extends TimeStamps {
   @Field()
   mtitle: string;
 
-  @prop({ type: () => String, required: false })
-  @Field({ nullable: true })
-  image?: string;
 
   @prop({ type: () => String, required: false })
   @Field({

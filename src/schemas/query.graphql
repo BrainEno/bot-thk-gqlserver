@@ -72,7 +72,6 @@ query GetBlogBySlug($slug: String!) {
     description
     body
     mtitle
-    image
     imageUri
     active
     likedBy {
@@ -118,7 +117,6 @@ query ListBlogsWithCatTag {
     slug
     _id
     mtitle
-    image
     imageUri
     active
     createdAt
@@ -225,5 +223,19 @@ query GetBlogById($blogId: String!) {
     title
     updatedAt
     mtitle
+  }
+}
+
+query SearchUsers($name: String!) {
+  searchUsers(name: $name) {
+    name
+    photo
+    profile
+    username
+    followingIds
+    followerIds
+    email
+    createdAt
+    about
   }
 }
