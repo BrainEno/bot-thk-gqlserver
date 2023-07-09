@@ -65,7 +65,12 @@ class AuthResolvers {
       });
 
       const token = jwt.sign(
-        { _id: user._id, name: user.name, role: user.role } as UserPayload,
+        {
+          _id: user._id,
+          name: user.name,
+          role: user.role,
+          username: user.username,
+        } as UserPayload,
         process.env.JWT_SECRET!,
         { expiresIn: '7d' }
       ) as string;
@@ -94,7 +99,12 @@ class AuthResolvers {
         throw new PasswordError('邮箱和密码不匹配，请重新输入');
 
       const token = jwt.sign(
-        { _id: user._id, role: user.role },
+        {
+          _id: user._id,
+          role: user.role,
+          name: user.name,
+          username: user.username,
+        },
         process.env.JWT_SECRET!,
         { expiresIn: '7d' }
       );

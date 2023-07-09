@@ -1,4 +1,15 @@
-import { Arg, Ctx, Mutation, Query, Resolver } from 'type-graphql';
+import {
+  Arg,
+  Ctx,
+  Mutation,
+  Publisher,
+  PubSub,
+  Query,
+  Resolver,
+  ResolverFilterData,
+  Root,
+  Subscription,
+} from 'type-graphql';
 
 import { BlogInput, Blog } from '../entities/blog';
 import { UserInputError } from 'apollo-server-express';
@@ -6,10 +17,14 @@ import { BlogModel, CategoryModel, TagModel, UserModel } from '../models';
 import { isEmpty } from 'class-validator';
 import { TContext } from '../types';
 import { smartTrim } from '../utils/smartTrim';
-import { NewBlogRes } from '../dtos/NewBlogRes';
+import { NewBlogRes } from '../dtos/newBlogResponse';
 import { Service } from 'typedi';
 import { slugify } from '../utils/slugify';
 import mongoose from 'mongoose';
+import { Topic } from '../topic';
+import { NewBlogPayload } from '../interfaces/notification.interface';
+import shortid from 'shortid';
+import { Notification } from '../dtos/notification';
 
 @Service()
 @Resolver()
@@ -24,7 +39,7 @@ class BlogResolvers {
       const blogs = await BlogModel.find()
         .populate('categories', '_id name slug')
         .populate('tags', '_id name slug')
-        .populate('author', '_id name username profile')
+        .populate('author', '_id name username profile photo about')
         .sort({ createdAt: -1 })
         .select(
           '_id title mtitle author body imageUri slug description categories tags createdAt updatedAt'
@@ -156,42 +171,32 @@ class BlogResolvers {
    * @returns
    */
   @Query(() => [Blog])
-  async getUserBlogs(@Arg('userId') userId: string): Promise<Blog[]> {
+  async getUserBlogs(
+    @Arg('userId', { nullable: true }) userId?: string,
+    @Arg('username', { nullable: true }) username?: string
+  ): Promise<Blog[]> {
+    let id = userId;
     try {
-      if (isEmpty(userId)) {
-        throw new UserInputError('userId can not be empty');
+      if (isEmpty(userId) && !isEmpty(username)) {
+        const user = await UserModel.findOne({ username });
+        if (user) id = user._id.toString();
+      } else if (!isEmpty(userId)) {
+        id = userId!;
+      } else {
+        throw new Error('paramter userId or username not found');
       }
-      const blogs = await BlogModel.find({
-        author: userId,
-      })
-        .populate('tags', 'name slug')
-        .populate('author', 'name')
-        .select('slug title author imageUri createdAt description')
-        .exec();
-      if (!blogs) throw new Error(`not found blogs belongs to user: ${userId}`);
-      return blogs;
-    } catch (err) {
-      console.log(err);
-      throw err;
-    }
-  }
 
-  @Query(() => [Blog])
-  async getBlogsByUsername(@Arg('username') username: string): Promise<Blog[]> {
-    try {
-      if (isEmpty(username)) {
-        throw new UserInputError('username can not be empty');
-      }
-      const user = await UserModel.findOne({ username });
-      const userId = user?._id;
       const blogs = await BlogModel.find({
-        author: userId,
+        author: id,
       })
         .populate('tags', 'name slug')
-        .populate('author', 'name')
-        .select('slug title author imageUri createdAt description')
-        .sort({ createdAt: 1 })
+        .populate('categories', 'name slug')
+        .populate('author', 'name username')
+        .select(
+          'slug title tags categories author imageUri createdAt description'
+        )
         .exec();
+
       if (!blogs) throw new Error(`not found blogs belongs to user: ${userId}`);
       return blogs;
     } catch (err) {
@@ -209,9 +214,14 @@ class BlogResolvers {
   async createBlog(
     @Ctx() { user }: TContext,
     @Arg('blogInput') blogInput: BlogInput,
+    @PubSub(Topic.NewNotification)
+    notifyAboutNewBlog: Publisher<NewBlogPayload>,
     @Arg('tagIds', () => [String], { nullable: true }) tagIds?: string[]
   ): Promise<NewBlogRes> {
-    if (!user) throw new Error('当前用户信息不可用，请重新登录');
+    if (!user) throw new Error('用户信息不可用，请重新登录');
+
+    const curUser = await UserModel.findOne({ _id: user._id });
+    if (!curUser) throw new Error('未找到该用户,请重新登录');
 
     if (!blogInput) throw new Error('缺少必要信息，完善后重新提交');
 
@@ -228,7 +238,8 @@ class BlogResolvers {
       name: 'Recent Post',
     });
 
-    const tags = tagIds && tagIds?.length ? strToRef(tagIds) : [defaultTag?._id];
+    const tags =
+      tagIds && tagIds?.length ? strToRef(tagIds) : [defaultTag?._id];
     const categories = [defaultCat?._id];
     let slug = slugify(title);
     const slugExist = await BlogModel.findOne({ slug });
@@ -248,7 +259,19 @@ class BlogResolvers {
         slug,
       });
 
-      await newBlog.save();
+      const blog = await newBlog.save();
+
+      await notifyAboutNewBlog({
+        blogSlug: blog.slug,
+        authorUsername: curUser.username,
+        blogTitle: blog.title,
+        authorName: curUser.name,
+        authorId:
+          typeof curUser._id === 'string'
+            ? curUser._id
+            : curUser._id.toString(),
+      });
+
       return { success: true, blog: newBlog };
     } catch (error) {
       console.log(error);
@@ -290,7 +313,8 @@ class BlogResolvers {
       name: 'else',
     });
 
-    const tags = tagIds&&tagIds?.length ? strToRef(tagIds) : [defaultTag!._id!];
+    const tags =
+      tagIds && tagIds?.length ? strToRef(tagIds) : [defaultTag!._id!];
     let slug = slugify(title || prevBlog.title);
     const slugExist = await BlogModel.findOne({ slug });
     if (slugExist && slugExist._id.toString() !== blogId) slug += '(1)';
@@ -321,6 +345,32 @@ class BlogResolvers {
     if (!user) throw new Error('当前用户信息不可用，请重新登录');
     const res = await BlogModel.findOneAndDelete({ _id: blogId });
     return res !== null;
+  }
+
+  @Subscription(() => Notification, {
+    topics: Topic.NewNotification,
+    filter: ({
+      payload,
+      args,
+    }: ResolverFilterData<NewBlogPayload, { followingIds: string[] }>) => {
+      return args.followingIds.includes(payload.authorId);
+    },
+  })
+  blogPublished(
+    @Root() payload: NewBlogPayload,
+    @Arg('followingIds', () => [String]) followingIds: string[]
+  ): Notification {
+    console.log('arg followingIds', followingIds);
+
+    const message = `${payload.authorName}__${payload.blogTitle}`;
+    const linkString = `${payload.authorUsername}__${payload.blogSlug}`;
+
+    return {
+      id: `blog_${shortid.generate()}`,
+      message,
+      linkString,
+      dateString: payload.dateString ?? new Date().toISOString(),
+    };
   }
 }
 

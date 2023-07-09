@@ -12,13 +12,14 @@ import { ObjectId } from 'bson';
 import { Field, ObjectType } from 'type-graphql';
 import { Comment } from './comment';
 import { ObjectId as ObjectID } from 'mongoose';
+import { TimeStamps } from '@typegoose/typegoose/lib/defaultClasses';
 
 @ObjectType()
 @modelOptions({
   schemaOptions: { timestamps: true },
   options: { allowMixed: Severity.ALLOW },
 })
-export class User {
+export class User extends TimeStamps {
   @Field(() => ObjectId)
   readonly _id: ObjectID;
 
@@ -83,12 +84,6 @@ export class User {
   })
   photo: string;
 
-  @Field(() => Date)
-  createdAt: Date;
-
-  @Field(() => Date)
-  updatedAt?: Date;
-
   @prop({ default: '' })
   @Field({ defaultValue: '' })
   resetPasswordLink: string;
@@ -112,6 +107,12 @@ export class User {
   @prop(() => [String])
   @Field(() => [String])
   followerIds: string[];
+
+  @Field(() => Date)
+  createdAt: Date;
+
+  @Field(() => Date, { nullable: true })
+  updatedAt?: Date;
 
   @Expose()
   _password: string;

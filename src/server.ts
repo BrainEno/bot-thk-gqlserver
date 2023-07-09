@@ -11,6 +11,7 @@ import express from 'express';
 import http from 'http';
 import mongoose from 'mongoose';
 import { InMemoryLRUCache } from '@apollo/utils.keyvaluecache';
+import { createHandler } from 'graphql-sse/lib/use/express';
 
 import { createSchema } from './utils/createSchema';
 import {
@@ -25,9 +26,7 @@ import {
 import cookieParser from 'cookie-parser';
 import { TContext } from './types';
 import cors from 'cors';
-import { context, getDynamicContext } from './context/typeGraphQLContext';
-import { WebSocketServer } from 'ws';
-import { useServer } from 'graphql-ws/lib/use/ws';
+import { context} from './context/typeGraphQLContext';
 import { LogService } from './services/LogService';
 import { ArgumentValidationError } from 'type-graphql';
 
@@ -42,13 +41,19 @@ const corsOptions = {
   credentials: true,
 };
 
+const MONGODB_URI = process.env.MONGODB_URI ?? 'mongodb://127.0.0.1:27017';
+
 const main = async () => {
   const logger = new LogService();
   const port = parseInt(process.env.PORT!, 10) || 4001;
+  const schema = createSchema();
+
+  const handler = createHandler({ schema });
   const app = express();
 
   app.use(cookieParser());
   app.use(cors(corsOptions));
+  app.use('/graphql/stream', handler);
 
   app.get('/', (_req, res) => {
     const data = {
@@ -61,44 +66,15 @@ const main = async () => {
 
   const httpServer = http.createServer(app);
 
-  const wsServer = new WebSocketServer({
-    server: httpServer,
-    path: '/graphql',
-  });
 
   try {
     mongoose
-      .connect(process.env.MONGODB_URI!)
+      .connect(MONGODB_URI)
       .then(() => logger.log('***MongoDB connected***'));
   } catch (error) {
     console.log('Error connecting to MongoDB:', error?.message);
   }
 
-  const schema = createSchema();
-
-  const serverCleanup = useServer(
-    {
-      schema,
-      context: (ctx, msg, args) => {
-        // console.log('ws ctx:', ctx);
-        // console.log('ws msg:', msg);
-        // console.log('ws args:', args);
-        return getDynamicContext(ctx, msg, args);
-      },
-      onConnect: async (_ctx) => {
-        // console.log('ctx onConnect:', ctx.connectionParams);
-        // Check authentication every time a client connects.
-        // if (tokenIsNotValid(ctx.connectionParams)) {
-        //   // You can return false to close the connection  or throw an explicit error
-        //   throw new Error('Auth token missing!');
-        // }
-      },
-      onDisconnect(_ctx, _code, _reason) {
-        console.log('Disconnected!');
-      },
-    },
-    wsServer
-  );
 
   const apolloServer = new ApolloServer({
     schema,
@@ -119,13 +95,6 @@ const main = async () => {
       ApolloServerPluginDrainHttpServer({ httpServer }),
       ApolloServerPluginInlineTrace(),
       {
-        async serverWillStart() {
-          return {
-            async drainServer() {
-              await serverCleanup.dispose();
-            },
-          };
-        },
         requestDidStart: () => ({
           //query complexity
           didResolveOperation({

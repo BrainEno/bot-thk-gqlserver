@@ -9,13 +9,14 @@ type Query {
   getBlogById(blogId: String!): Blog!
   searchBlogs(query: String!): [Blog!]!
   getRelatedBlogs(limit: Float, tagIds: [String!]!, catIds: [String!]!, slug: String!): [Blog!]!
-  getUserBlogs(userId: String!): [Blog!]!
-  getBlogsByUsername(username: String!): [Blog!]!
+  getUserBlogs(username: String, userId: String): [Blog!]!
   listCats: [Category!]!
   getCatBlogs(slug: String!): [Blog!]!
   hello: String!
   currentUser: User
+  getUserInfo(username: String!): UserInfoResponse!
   searchUsers(name: String!): [User!]
+  getFollowInfo(username: String): FollowInfo
   listTags: [Tag!]!
   getTagBlogs(slug: String!): [Blog!]!
 }
@@ -50,29 +51,27 @@ type User {
   about: String
   role: String!
   photo: String
-  createdAt: DateTime!
-  updatedAt: DateTime!
   resetPasswordLink: String
   commented: [Comment!]!
   followings: [User!]!
   followers: [User!]!
   followingIds: [String!]!
   followerIds: [String!]!
+  createdAt: DateTime!
+  updatedAt: DateTime
 }
-
-"""
-The javascript `Date` as string. Type represents date and time as the ISO Date string.
-"""
-scalar DateTime
 
 type Comment {
   _id: ObjectId!
   content: String!
   by: User!
   atBlog: Blog!
-  createdAt: DateTime!
-  updatedAt: DateTime!
 }
+
+"""
+The javascript `Date` as string. Type represents date and time as the ISO Date string.
+"""
+scalar DateTime
 
 type Category {
   _id: ObjectId!
@@ -84,6 +83,20 @@ type Tag {
   _id: ObjectId!
   name: String!
   slug: String!
+}
+
+type UserInfoResponse {
+  username: String!
+  name: String!
+  email: String!
+  about: String!
+  photo: String!
+  createdAt: DateTime!
+}
+
+type FollowInfo {
+  followers: [User!]!
+  followings: [User!]!
 }
 
 type Mutation {
@@ -115,5 +128,13 @@ input BlogInput {
 }
 
 type Subscription {
-  userFollowed(name: String!): String!
+  blogPublished(followingIds: [String!]!): Notification!
+  userFollowed(name: String!): Notification!
+}
+
+type Notification {
+  id: ID!
+  message: String!
+  linkString: String!
+  dateString: String!
 }

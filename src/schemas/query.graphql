@@ -10,6 +10,8 @@ query CurrentUser {
     photo
     createdAt
     updatedAt
+    followingIds
+    followerIds
   }
 }
 
@@ -168,17 +170,25 @@ query SearchBlogs($query: String!) {
   }
 }
 
-query GetUserBlogs($userId: String!) {
-  getUserBlogs(userId: $userId) {
-    _id
-    active
+query GetUserBlogs($userId: String, $username: String) {
+  getUserBlogs(userId: $userId, username: $username) {
     author {
       name
+      username
     }
+    categories {
+      name
+      slug
+    }
+    tags {
+      slug
+      name
+    }
+    title
     createdAt
     description
+    imageUri
     slug
-    title
   }
 }
 
@@ -228,14 +238,51 @@ query GetBlogById($blogId: String!) {
 
 query SearchUsers($name: String!) {
   searchUsers(name: $name) {
-    name
-    photo
-    profile
     username
+    name
+    email
+    profile
+    about
+    photo
     followingIds
     followerIds
-    email
+  }
+}
+
+query GetUserInfo($username: String!) {
+  getUserInfo(username: $username) {
     createdAt
+    email
+    name
+    photo
     about
+    username
+  }
+}
+
+query GetFollowInfo($username: String) {
+  getFollowInfo(username: $username) {
+    followers {
+      _id
+      username
+      name
+      email
+      profile
+      about
+      photo
+      followingIds
+      followerIds
+    }
+    followings {
+      _id
+      username
+      name
+      email
+      profile
+      about
+      photo
+      followingIds
+      followerIds
+    }
   }
 }

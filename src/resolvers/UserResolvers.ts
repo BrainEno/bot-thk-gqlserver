@@ -6,6 +6,7 @@ import {
   PubSub,
   Query,
   Resolver,
+  ResolverFilterData,
   Root,
   Subscription,
 } from 'type-graphql';
@@ -17,7 +18,11 @@ import { UserModel } from '../models';
 import { AuthenticationError } from 'apollo-server-express';
 import { isEmail, isEmpty } from 'class-validator';
 import { Topic } from '../topic';
-import { NewFollowerPayload } from '../interfaces/newFollower.interface';
+import { NewFollowerPayload } from '../interfaces/notification.interface';
+import shortid from 'shortid';
+import { Notification } from '../dtos/notification';
+import { FollowInfo } from '../dtos/followInfo';
+import { UserInfoResponse } from '../dtos/userInfoResponse';
 
 @Service()
 @Resolver()
@@ -38,30 +43,95 @@ class UserResolvers {
     }
   }
 
+  @Query(() => UserInfoResponse)
+  async getUserInfo(
+    @Arg('username') username: string
+  ): Promise<UserInfoResponse> {
+    try {
+      if (isEmpty(username)) throw new Error('invalid username');
+      const user = await UserModel.findOne({ username });
+      if (!user) throw new Error('user info not found');
+      return {
+        username: user.username,
+        name: user.name,
+        email: user.email,
+        about: user.about || '',
+        photo: user.photo,
+        createdAt: user.createdAt,
+      };
+    } catch (error) {
+      console.log(error);
+      throw error;
+    }
+  }
+
   @Query(() => [User], { nullable: true })
   async searchUsers(@Ctx() { user }: TContext, @Arg('name') name: string) {
     if (user === null) throw new AuthenticationError('please login');
-
     try {
       const users = await UserModel.find({
-        name,
-        $options: 'i',
+        name: { $regex: name, $options: 'i' },
       })
-        .select('name email profile about photo')
+        .select(
+          'username name email profile about photo followingIds followerIds'
+        )
         .exec();
 
-      if (!users) throw new Error(`users not found`);
+      if (!users) return [];
       return users;
     } catch (err) {
       throw err;
     }
   }
 
+  @Query(() => FollowInfo, { nullable: true })
+  async getFollowInfo(
+    @Ctx() { user }: TContext,
+    @Arg('username', { nullable: true }) username?: string
+  ) {
+    let toSearch: any;
+    if (username) toSearch = await UserModel.findOne({ username });
+    if (!username && user)
+      toSearch = await UserModel.findOne({ _id: user._id });
+
+    try {
+      if (toSearch) {
+        const followings = await UserModel.find({
+          _id: {
+            $in: toSearch.followings,
+          },
+        })
+          .select(
+            '_id username name email profile about photo followingIds followerIds'
+          )
+          .exec();
+
+        const followers = await UserModel.find({
+          _id: {
+            $in: toSearch.followers,
+          },
+        })
+          .select(
+            '_id username name email profile about photo followingIds followerIds'
+          )
+          .exec();
+
+        return { followers, followings };
+      }
+    } catch (err) {
+      throw err;
+    }
+    return {
+      followers: [],
+      followings: [],
+    };
+  }
+
   @Mutation(() => Boolean)
   async follow(
     @Ctx() context: TContext,
     @Arg('followName') followName: string,
-    @PubSub(Topic.NewFollower)
+    @PubSub(Topic.NewNotification)
     notifyAboutNewFollower: Publisher<NewFollowerPayload>
   ) {
     if (isEmpty(followName)) throw new Error('该用户不存在');
@@ -100,10 +170,10 @@ class UserResolvers {
         toFollow.addFollowerId(curUser.id.toString());
 
         const payload = {
-          followerId: curUser._id.toString(),
           dateString: new Date().toISOString(),
           followerName: curUser.name,
           followedName: toFollow.name,
+          followerUsername: curUser.username,
         };
 
         await notifyAboutNewFollower(payload);
@@ -184,7 +254,7 @@ class UserResolvers {
   ): Promise<boolean> {
     try {
       if (user === null) throw new AuthenticationError('please login');
-      const userInDB = await UserModel.findById(user._id);
+      const userInDB = await UserModel.findOne({ _id: user._id });
       if (userInDB) {
         if (!isEmpty(name)) {
           userInDB.name = name!;
@@ -209,18 +279,27 @@ class UserResolvers {
     }
   }
 
-  @Subscription({
-    topics: Topic.NewFollower,
-    filter: ({ payload, args }) => {
+  @Subscription(() => Notification, {
+    topics: Topic.NewNotification,
+    filter: ({
+      payload,
+      args,
+    }: ResolverFilterData<NewFollowerPayload, { name: string }>) => {
       return payload.followedName === args.name;
     },
   })
   userFollowed(
     @Root() payload: NewFollowerPayload,
     @Arg('name') name: string
-  ): string {
-    console.log('arg name: ',name);
-    return `${payload.followerName} followed you at ${payload.dateString}`;
+  ): Notification {
+    console.log('arg name: ', name);
+
+    return {
+      id: `user_${shortid.generate()}`,
+      message: payload.followerName,
+      dateString: payload.dateString ?? new Date().toISOString(),
+      linkString: payload.followerUsername,
+    };
   }
 }
 

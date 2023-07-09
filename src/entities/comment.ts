@@ -1,4 +1,5 @@
 import { getModelForClass, prop, Ref } from '@typegoose/typegoose'
+import { TimeStamps } from '@typegoose/typegoose/lib/defaultClasses'
 import { ObjectId } from 'bson'
 import { ObjectId as ObjectID } from 'mongoose'
 import { Field, ObjectType } from 'type-graphql'
@@ -7,7 +8,7 @@ import { Blog } from './blog'
 import { User } from './user'
 
 @ObjectType()
-export class Comment {
+export class Comment extends TimeStamps {
     @Field(() => ObjectId)
     readonly _id: ObjectID
 
@@ -23,11 +24,6 @@ export class Comment {
     @Field(() => Blog)
     atBlog: Ref<Blog>
 
-    @Field(() => Date)
-    createdAt: Date
-
-    @Field(() => Date)
-    updatedAt?: Date
 }
 
 export const CommentModel = getModelForClass(Comment, {

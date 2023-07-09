@@ -1,3 +1,17 @@
-subscription Subscription($name: String!) {
-  userFollowed(name: $name)
+subscription BlogPublished($followingIds: [String!]!) {
+  blogPublished(followingIds: $followingIds) {
+    dateString
+    linkString
+    id
+    message
+  }
+}
+
+subscription UserFollowed($name: String!) {
+  userFollowed(name: $name) {
+    dateString
+    linkString
+    id
+    message
+  }
 }
