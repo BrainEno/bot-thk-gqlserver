@@ -114,6 +114,9 @@ export class User extends TimeStamps {
   @Field(() => Date, { nullable: true })
   updatedAt?: Date;
 
+  @prop({ default: 0 })
+  tokenVersion: number;
+
   @Expose()
   _password: string;
 

@@ -26,11 +26,11 @@ import {
 import cookieParser from 'cookie-parser';
 import { TContext } from './types';
 import cors from 'cors';
-import { context} from './context/typeGraphQLContext';
+import { context } from './context/typeGraphQLContext';
 import { LogService } from './services/LogService';
 import { ArgumentValidationError } from 'type-graphql';
 
-dotenv.config();
+dotenv.config({ debug: process.env.NODE_ENV === 'development' });
 
 const corsOptions = {
   origin: [
@@ -66,7 +66,6 @@ const main = async () => {
 
   const httpServer = http.createServer(app);
 
-
   try {
     mongoose
       .connect(MONGODB_URI)
@@ -74,7 +73,6 @@ const main = async () => {
   } catch (error) {
     console.log('Error connecting to MongoDB:', error?.message);
   }
-
 
   const apolloServer = new ApolloServer({
     schema,

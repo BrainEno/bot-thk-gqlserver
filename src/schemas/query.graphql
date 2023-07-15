@@ -172,6 +172,7 @@ query SearchBlogs($query: String!) {
 
 query GetUserBlogs($userId: String, $username: String) {
   getUserBlogs(userId: $userId, username: $username) {
+    _id
     author {
       name
       username

@@ -17,7 +17,7 @@ import { BlogModel, CategoryModel, TagModel, UserModel } from '../models';
 import { isEmpty } from 'class-validator';
 import { TContext } from '../types';
 import { smartTrim } from '../utils/smartTrim';
-import { NewBlogRes } from '../dtos/newBlogResponse';
+import { NewBlogResponse } from '../dtos/newBlogResponse';
 import { Service } from 'typedi';
 import { slugify } from '../utils/slugify';
 import mongoose from 'mongoose';
@@ -193,7 +193,7 @@ class BlogResolvers {
         .populate('categories', 'name slug')
         .populate('author', 'name username')
         .select(
-          'slug title tags categories author imageUri createdAt description'
+          '_id slug title tags categories author imageUri createdAt description'
         )
         .exec();
 
@@ -210,14 +210,14 @@ class BlogResolvers {
    * @param blog
    * @returns
    */
-  @Mutation(() => NewBlogRes)
+  @Mutation(() => NewBlogResponse)
   async createBlog(
     @Ctx() { user }: TContext,
     @Arg('blogInput') blogInput: BlogInput,
     @PubSub(Topic.NewNotification)
     notifyAboutNewBlog: Publisher<NewBlogPayload>,
     @Arg('tagIds', () => [String], { nullable: true }) tagIds?: string[]
-  ): Promise<NewBlogRes> {
+  ): Promise<NewBlogResponse> {
     if (!user) throw new Error('用户信息不可用，请重新登录');
 
     const curUser = await UserModel.findOne({ _id: user._id });
@@ -279,13 +279,13 @@ class BlogResolvers {
     }
   }
 
-  @Mutation(() => NewBlogRes)
+  @Mutation(() => NewBlogResponse)
   async updateBlog(
     @Ctx() { user }: TContext,
     @Arg('blogId') blogId: string,
     @Arg('blogInput') blogInput: BlogInput,
     @Arg('tagIds', () => [String], { nullable: true }) tagIds?: string[]
-  ): Promise<NewBlogRes> {
+  ): Promise<NewBlogResponse> {
     if (!user) throw new Error('当前用户信息不可用，请重新登录');
 
     if (!blogInput) throw new Error('缺少必要信息，完善后重新提交');

@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "license": "MIT",
   "scripts": {
-    "dev": "nodemon --watch 'src/**/*.ts' --exec ts-node src/server.ts",
+    "dev": "nodemon --watch 'src/**/*.ts' -e ts --exec ts-node src/server.ts",
     "watch": "tsc --project tsconfig.json --watch",
     "build": "tsc --project tsconfig.build.json",
     "prestart": "npm run build",

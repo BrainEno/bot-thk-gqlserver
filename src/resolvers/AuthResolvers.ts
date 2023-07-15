@@ -1,15 +1,31 @@
-import { ApolloError } from 'apollo-server-errors';
+import { ApolloError, AuthenticationError } from 'apollo-server-errors';
 import { isEmail, isEmpty } from 'class-validator';
 import dotenv from 'dotenv';
-import jwt from 'jsonwebtoken';
+import jwt, { verify } from 'jsonwebtoken';
 import path from 'path';
 import shortId from 'shortid';
-import { Arg, Ctx, Mutation, Resolver } from 'type-graphql';
+import {
+  Arg,
+  Ctx,
+  Mutation,
+  Query,
+  Resolver,
+  UseMiddleware,
+} from 'type-graphql';
 
 import { TContext, UserPayload } from '../types';
 import { Service } from 'typedi';
 import { UserModel } from '../models';
 import sgMail from '@sendgrid/mail';
+import {
+  setRefreshToken,
+  createRefreshToken,
+  setAccessToken,
+  createAccessToken,
+} from '../utils/sendRefreshToken';
+import { isAdmin } from '../middlewares/authChecker';
+import { UserResponse } from '../dtos/userResponse';
+import { User } from '../entities/user';
 
 dotenv.config({ path: path.join(__dirname, '../.env.local') });
 
@@ -62,18 +78,10 @@ class AuthResolvers {
         profile,
         username,
         role: '0',
+        tokenVersion: 0,
       });
 
-      const token = jwt.sign(
-        {
-          _id: user._id,
-          name: user.name,
-          role: user.role,
-          username: user.username,
-        } as UserPayload,
-        process.env.JWT_SECRET!,
-        { expiresIn: '7d' }
-      ) as string;
+      const token = createRefreshToken(user);
 
       await user.save();
       return token;
@@ -82,12 +90,12 @@ class AuthResolvers {
     }
   }
 
-  @Mutation(() => Boolean)
+  @Mutation(() => UserResponse)
   async login(
     @Arg('email') email: string,
     @Arg('password') password: string,
     @Ctx() context: TContext
-  ): Promise<boolean> {
+  ): Promise<UserResponse> {
     try {
       if (isEmpty(email)) throw new EmailError('邮箱不得为空');
       if (isEmpty(password)) throw new PasswordError('密码不得为空');
@@ -98,31 +106,84 @@ class AuthResolvers {
       if (!passwordMatches)
         throw new PasswordError('邮箱和密码不匹配，请重新输入');
 
-      const token = jwt.sign(
-        {
-          _id: user._id,
-          role: user.role,
-          name: user.name,
-          username: user.username,
-        },
-        process.env.JWT_SECRET!,
-        { expiresIn: '7d' }
-      );
+      const accessToken = createAccessToken(user);
+      const refreshToken = createRefreshToken(user);
 
-      context.res.cookie('botthk', token, {
-        httpOnly: true,
-        maxAge: 1000 * 60 * 60 * 24 * 7,
-        sameSite: 'none',
-        secure: true,
-      });
+      setRefreshToken(context.res, refreshToken);
+      setAccessToken(context.res, accessToken);
 
-      context.res.setHeader('authorization', `Bearer ${token}`);
-
-      return true;
+      return {
+        ok: true,
+        accessToken: accessToken,
+      };
     } catch (error) {
       console.log(error);
-      return false;
+      throw new AuthenticationError(error);
     }
+  }
+
+  @Mutation(()=>UserResponse)
+  async refreshToken(@Ctx() { req, res }: TContext) {
+    const token = req.cookies.botthk_refresh;
+    if (!token) {
+      return { ok: false, accessToken: '' };
+    }
+
+    let payload: TContext['user'] = null;
+    try {
+      payload = verify(token, process.env.REFRESH_TOKEN_SECRET!) as UserPayload;
+    } catch (error) {
+      return { ok: false, accessToken: '' };
+    }
+
+    const user = await UserModel.findOne({ _id: payload._id });
+
+    if (!user) return { ok: false, accessToken: '' };
+
+    if (user.tokenVersion !== payload.tokenVersion)
+      return { ok: false, accessToken: '' };
+
+    setRefreshToken(res, createRefreshToken(user));
+
+    return { ok: true, accessToken: createAccessToken(user) };
+  }
+
+  @Query(() => User, { nullable: true })
+  async currentUser(@Ctx() { res, user }: TContext): Promise<User | null> {
+    let payload = user;
+
+    if (!payload) {
+      return null;
+    }
+
+    try {
+      const curUser = await UserModel.findOne({
+        _id: payload._id,
+        tokenVersion: payload.tokenVersion,
+      });
+
+      if (curUser) {
+        setRefreshToken(res, createRefreshToken(curUser));
+        setAccessToken(res, createAccessToken(curUser));
+        return curUser;
+      }
+      return null;
+    } catch (error) {
+      console.log(error);
+      throw new AuthenticationError(error);
+    }
+  }
+
+  @Mutation(() => Boolean)
+  async logout(@Ctx() { req, res }: TContext): Promise<boolean> {
+    if (req.headers.cookie) {
+      req.headers.authorization = '';
+      res.clearCookie('botthk_access');
+      res.clearCookie('botthk_refresh');
+
+      return true;
+    }
+    return false;
   }
 
   @Mutation(() => String)
@@ -169,6 +230,21 @@ class AuthResolvers {
 
       return false;
     }
+  }
+
+  @UseMiddleware(isAdmin)
+  @Mutation(() => Boolean)
+  async revokeRefreshTokensForUser(
+    @Arg('userId', () => String) userId: string
+  ) {
+    const user = await UserModel.findOne({ _id: userId });
+    if (user) {
+      user.tokenVersion += 1;
+      await user.save();
+      return true;
+    }
+
+    return false;
   }
 }
 

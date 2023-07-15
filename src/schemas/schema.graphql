@@ -4,6 +4,7 @@
 # -----------------------------------------------
 
 type Query {
+  currentUser: User
   listBlogsWithCatTag: [Blog!]!
   getBlogBySlug(slug: String!): Blog!
   getBlogById(blogId: String!): Blog!
@@ -12,35 +13,12 @@ type Query {
   getUserBlogs(username: String, userId: String): [Blog!]!
   listCats: [Category!]!
   getCatBlogs(slug: String!): [Blog!]!
-  hello: String!
-  currentUser: User
   getUserInfo(username: String!): UserInfoResponse!
   searchUsers(name: String!): [User!]
   getFollowInfo(username: String): FollowInfo
   listTags: [Tag!]!
   getTagBlogs(slug: String!): [Blog!]!
 }
-
-type Blog {
-  _id: ObjectId!
-  title: String!
-  slug: String!
-  description: String
-  body: String!
-  mtitle: String!
-  imageUri: String
-  active: Boolean
-  likedBy: [User!]
-  comments: [Comment!]
-  categories: [Category!]!
-  tags: [Tag!]!
-  author: User!
-  createdAt: DateTime!
-  updatedAt: DateTime!
-}
-
-"""Mongo object id scalar type"""
-scalar ObjectId
 
 type User {
   _id: ObjectId!
@@ -61,6 +39,9 @@ type User {
   updatedAt: DateTime
 }
 
+"""Mongo object id scalar type"""
+scalar ObjectId
+
 type Comment {
   _id: ObjectId!
   content: String!
@@ -68,10 +49,23 @@ type Comment {
   atBlog: Blog!
 }
 
-"""
-The javascript `Date` as string. Type represents date and time as the ISO Date string.
-"""
-scalar DateTime
+type Blog {
+  _id: ObjectId!
+  title: String!
+  slug: String!
+  description: String
+  body: String!
+  mtitle: String!
+  imageUri: String
+  active: Boolean
+  likedBy: [User!]
+  comments: [Comment!]
+  categories: [Category!]!
+  tags: [Tag!]!
+  author: User!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
 
 type Category {
   _id: ObjectId!
@@ -84,6 +78,11 @@ type Tag {
   name: String!
   slug: String!
 }
+
+"""
+The javascript `Date` as string. Type represents date and time as the ISO Date string.
+"""
+scalar DateTime
 
 type UserInfoResponse {
   username: String!
@@ -101,11 +100,14 @@ type FollowInfo {
 
 type Mutation {
   register(password: String!, email: String!, name: String!): String!
-  login(password: String!, email: String!): Boolean!
+  login(password: String!, email: String!): UserResponse!
+  refreshToken: UserResponse!
+  logout: Boolean!
   forgotPassword(email: String!): String!
   resetPassword(password: String!, username: String!): Boolean!
-  createBlog(tagIds: [String!], blogInput: BlogInput!): NewBlogRes!
-  updateBlog(tagIds: [String!], blogInput: BlogInput!, blogId: String!): NewBlogRes!
+  revokeRefreshTokensForUser(userId: String!): Boolean!
+  createBlog(tagIds: [String!], blogInput: BlogInput!): NewBlogResponse!
+  updateBlog(tagIds: [String!], blogInput: BlogInput!, blogId: String!): NewBlogResponse!
   deleteBlogById(blogId: String!): Boolean!
   newCat(catName: String!): Boolean!
   deleteCat(id: String!): Boolean!
@@ -116,7 +118,12 @@ type Mutation {
   deleteTag(id: String!): Boolean!
 }
 
-type NewBlogRes {
+type UserResponse {
+  ok: Boolean!
+  accessToken: String!
+}
+
+type NewBlogResponse {
   success: Boolean!
 }
 

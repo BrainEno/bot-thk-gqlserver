@@ -1,30 +1,37 @@
 import jwt from 'jsonwebtoken';
 
 import { TContext, UserPayload } from '../types';
+import dotenv from 'dotenv';
 
-const findUser = async (authToken: string) => {
-  const currentUser = jwt.decode(authToken) as UserPayload;
-  return currentUser;
+dotenv.config({ debug: process.env.NODE_ENV === 'development' });
+
+const findUser = async (token: string) => {
+  let user: UserPayload | null;
+  try {
+    user = jwt.verify(token, process.env.REFRESH_TOKEN_SECRET!) as UserPayload;
+  } catch (error) {
+    console.log('jwt verify error', error.message);
+    user = null;
+  }
+  return user;
 };
-
 
 export const context = async (context: TContext) => {
   const { req, res } = context;
 
   let token = '';
-  if (req.cookies.botthk) {
-    token = req.cookies.botthk;
+  let user: TContext['user'] = null;
+  if (req.cookies.botthk_refresh) {
+    token = req.cookies.botthk_refresh;
   } else if (req.headers['cookie']) {
-    token = req.headers['cookie'].split('botthk=')[1];
+    token = req.headers['cookie'].split('botthk_refresh=')[1];
   } else if (req.headers['authorization']) {
     token = req.headers.authorization.split('Bearer ')[1];
   }
 
-  const user = await findUser(token);
+  if (token) {
+    user = await findUser(token);
+  }
 
-  const typeGraphQLContext = {
-    req,
-    user,
-  };
-  return { ...typeGraphQLContext, res };
+  return { req, res, user };
 };

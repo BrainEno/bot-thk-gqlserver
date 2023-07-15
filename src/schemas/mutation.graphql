@@ -11,7 +11,10 @@ mutation Register(
 }
 
 mutation Login($password: String!, $email: String!) {
-  login(password: $password, email: $email)
+  login(password: $password, email: $email) {
+    accessToken
+    ok
+  }
 }
 
 mutation CreateBlog($blogInput: BlogInput!, $tagIds: [String!]) {
@@ -20,9 +23,16 @@ mutation CreateBlog($blogInput: BlogInput!, $tagIds: [String!]) {
   }
 }
 
-# mutation Logout {
-#   logout
-# }
+mutation Logout {
+  logout
+}
+
+mutation RefreshToken {
+  refreshToken {
+    ok
+    accessToken
+  }
+}
 
 mutation EditProfile(
   $about: String
@@ -77,4 +87,8 @@ mutation Follow($followName: String!) {
 
 mutation UnFollow($name: String!) {
   unFollow(name: $name)
+}
+
+mutation Mutation {
+  logout
 }

@@ -27,22 +27,6 @@ import { UserInfoResponse } from '../dtos/userInfoResponse';
 @Service()
 @Resolver()
 class UserResolvers {
-  @Query(() => String)
-  hello(): string {
-    return 'Hello from userResolver';
-  }
-
-  @Query(() => User, { nullable: true })
-  async currentUser(@Ctx() { user }: TContext): Promise<User | null> {
-    try {
-      if (user === null) return null;
-      return await UserModel.findById(user._id);
-    } catch (error) {
-      console.log(error);
-      return null;
-    }
-  }
-
   @Query(() => UserInfoResponse)
   async getUserInfo(
     @Arg('username') username: string
@@ -129,22 +113,21 @@ class UserResolvers {
 
   @Mutation(() => Boolean)
   async follow(
-    @Ctx() context: TContext,
+    @Ctx() { user }: TContext,
     @Arg('followName') followName: string,
     @PubSub(Topic.NewNotification)
     notifyAboutNewFollower: Publisher<NewFollowerPayload>
   ) {
     if (isEmpty(followName)) throw new Error('该用户不存在');
     try {
-      if (context.user === null)
-        throw new AuthenticationError('not authenticated');
-      const curUser = await UserModel.findOne({ _id: context.user._id });
+      if (user === null) throw new AuthenticationError('not authenticated');
+      const curUser = await UserModel.findOne({ _id: user._id });
       if (!curUser) throw new AuthenticationError('please login');
 
       const toFollow = await UserModel.findOne({ name: followName });
 
       if (!toFollow) throw new Error('该用户不存在或已注销');
-      if (context.user._id === toFollow._id)
+      if (user._id === toFollow._id)
         throw new AuthenticationError('不能关注自己');
 
       if (!curUser.followings) curUser.followings = [];
