@@ -1,4 +1,4 @@
-import jwt from 'jsonwebtoken';
+import jwt, { verify } from 'jsonwebtoken';
 
 import { TContext, UserPayload } from '../types';
 import dotenv from 'dotenv';
@@ -20,17 +20,22 @@ export const context = async (context: TContext) => {
   const { req, res } = context;
 
   let token = '';
+  let accessToken = '';
   let user: TContext['user'] = null;
   if (req.cookies.botthk_refresh) {
     token = req.cookies.botthk_refresh;
   } else if (req.headers['cookie']) {
     token = req.headers['cookie'].split('botthk_refresh=')[1];
-  } else if (req.headers['authorization']) {
-    token = req.headers.authorization.split('Bearer ')[1];
+  }
+
+  if (req.headers['authorization']) {
+    accessToken = req.headers.authorization.split('Bearer ')[1];
   }
 
   if (token) {
     user = await findUser(token);
+  } else if (accessToken) {
+    user = verify(accessToken, process.env.ACCESS_TOKEN_SECRET!) as UserPayload;
   }
 
   return { req, res, user };

@@ -89,6 +89,4 @@ mutation UnFollow($name: String!) {
   unFollow(name: $name)
 }
 
-mutation Mutation {
-  logout
-}
+

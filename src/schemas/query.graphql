@@ -164,8 +164,16 @@ query SearchBlogs($query: String!) {
   searchBlogs(query: $query) {
     slug
     title
+    description
+    createdAt
+    imageUri
     author {
       name
+      photo
+    }
+    tags {
+      name
+      slug
     }
   }
 }

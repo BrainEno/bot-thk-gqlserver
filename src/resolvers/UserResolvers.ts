@@ -50,8 +50,7 @@ class UserResolvers {
   }
 
   @Query(() => [User], { nullable: true })
-  async searchUsers(@Ctx() { user }: TContext, @Arg('name') name: string) {
-    if (user === null) throw new AuthenticationError('please login');
+  async searchUsers(@Arg('name') name: string) {
     try {
       const users = await UserModel.find({
         name: { $regex: name, $options: 'i' },
@@ -120,15 +119,15 @@ class UserResolvers {
   ) {
     if (isEmpty(followName)) throw new Error('该用户不存在');
     try {
-      if (user === null) throw new AuthenticationError('not authenticated');
+      if (user === null) throw new AuthenticationError('Not Authenticated');
       const curUser = await UserModel.findOne({ _id: user._id });
-      if (!curUser) throw new AuthenticationError('please login');
+      if (!curUser) throw new AuthenticationError('Please Login');
 
       const toFollow = await UserModel.findOne({ name: followName });
 
       if (!toFollow) throw new Error('该用户不存在或已注销');
       if (user._id === toFollow._id)
-        throw new AuthenticationError('不能关注自己');
+        throw new Error('不能关注自己');
 
       if (!curUser.followings) curUser.followings = [];
       if (!toFollow.followers) toFollow.followers = [];
@@ -170,7 +169,7 @@ class UserResolvers {
       }
     } catch (err) {
       console.log(err);
-      return false;
+      throw err;
     }
   }
 
@@ -181,7 +180,7 @@ class UserResolvers {
       if (context.user === null)
         throw new AuthenticationError('not authenticated');
       const curUser = await UserModel.findOne({ _id: context.user._id });
-      if (!curUser) throw new AuthenticationError('please login');
+      if (!curUser) throw new AuthenticationError('Please Login');
 
       const unFollow = await UserModel.findOne({ name });
 
@@ -223,7 +222,7 @@ class UserResolvers {
       }
     } catch (err) {
       console.log(err);
-      return false;
+      throw err;
     }
   }
 
@@ -236,7 +235,7 @@ class UserResolvers {
     @Arg('about', { nullable: true }) about?: string
   ): Promise<boolean> {
     try {
-      if (user === null) throw new AuthenticationError('please login');
+      if (user === null) throw new AuthenticationError('Please Login');
       const userInDB = await UserModel.findOne({ _id: user._id });
       if (userInDB) {
         if (!isEmpty(name)) {
