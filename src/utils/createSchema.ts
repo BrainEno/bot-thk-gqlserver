@@ -1,6 +1,5 @@
 import path from 'path';
 import { buildSchemaSync } from 'type-graphql';
-import { Container } from 'typedi';
 
 import { authChecker } from '../middlewares/authChecker';
 import AuthResolvers from '../resolvers/AuthResolvers';
@@ -13,6 +12,8 @@ import TagResolvers from '../resolvers/TagResolvers';
 import { RedisPubSub } from 'graphql-redis-subscriptions';
 import Redis, { RedisOptions } from 'ioredis';
 import dotenv from 'dotenv';
+import ConversationResolvers from '../resolvers/ConversationResolvers';
+import MessageResolvers from '../resolvers/MessageResolvers';
 
 dotenv.config();
 
@@ -36,6 +37,8 @@ export const createSchema = () =>
       BlogResolvers,
       CatResolvers,
       TagResolvers,
+      ConversationResolvers,
+      MessageResolvers,
     ],
     pubSub,
     authChecker: authChecker,
@@ -45,5 +48,5 @@ export const createSchema = () =>
       sortedSchema: false,
     },
     scalarsMap: [{ type: ObjectId, scalar: ObjectIdScalar }],
-    container: Container,
+    // container: Container,
   });

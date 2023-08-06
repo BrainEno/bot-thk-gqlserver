@@ -18,6 +18,8 @@ type Query {
   getFollowInfo(username: String): FollowInfo
   listTags: [Tag!]!
   getTagBlogs(slug: String!): [Blog!]!
+  conversations: [Conversation!]!
+  messages(conversationId: String!): [Message!]!
 }
 
 type User {
@@ -85,6 +87,7 @@ The javascript `Date` as string. Type represents date and time as the ISO Date s
 scalar DateTime
 
 type UserInfoResponse {
+  _id: String!
   username: String!
   name: String!
   email: String!
@@ -98,10 +101,39 @@ type FollowInfo {
   followings: [User!]!
 }
 
+type Conversation {
+  _id: ObjectId!
+  participants: [Participant!]!
+  participantUserIds: [String!]!
+  messages: [Message!]!
+  latestMessage: Message
+  latestMessageId: String
+  createdAt: DateTime
+  updatedAt: DateTime!
+}
+
+type Participant {
+  _id: ObjectId!
+  user: User!
+  userId: String!
+  conversation: Conversation!
+  conversationId: String!
+  hasSeenLatestMessage: Boolean!
+}
+
+type Message {
+  _id: ObjectId!
+  body: String!
+  sender: User!
+  senderId: String!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
 type Mutation {
   register(password: String!, email: String!, name: String!): String!
   login(password: String!, email: String!): UserResponse!
-  refreshToken: UserResponse!
+  refreshToken(userId: String): UserResponse!
   logout: Boolean!
   forgotPassword(email: String!): String!
   resetPassword(password: String!, username: String!): Boolean!
@@ -116,6 +148,11 @@ type Mutation {
   editProfile(about: String, photo: String, email: String, name: String): Boolean!
   newTag(tagName: String!): Boolean!
   deleteTag(id: String!): Boolean!
+  createConversation(participantIds: [String!]!): String!
+  markConversationAsRead(conversation: String!, userId: String!): Boolean!
+  deleteConversation(conversationId: String!): Boolean!
+  updateParticipants(participantIds: [String!]!, conversationId: String!): Boolean!
+  sendMessage(conversationId: String!, senderId: String!, body: String!): Boolean!
 }
 
 type UserResponse {
@@ -137,6 +174,10 @@ input BlogInput {
 type Subscription {
   blogPublished(followingIds: [String!]!): Notification!
   userFollowed(name: String!): Notification!
+  conversationCreated: Boolean!
+  conversationUpdated: Boolean!
+  conversationDeleted: Boolean!
+  messageSent(conversationId: String!): Boolean!
 }
 
 type Notification {

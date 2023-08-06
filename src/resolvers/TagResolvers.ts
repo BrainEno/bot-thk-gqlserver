@@ -1,12 +1,10 @@
 import { Arg, Authorized, Mutation, Query, Resolver } from 'type-graphql';
-import { Service } from 'typedi';
 import { Blog } from '../entities/blog';
 import { Tag } from '../entities/tag';
 
 import { BlogModel, TagModel } from '../models';
 import { slugify } from '../utils/slugify';
 
-@Service()
 @Resolver()
 class TagResolvers {
   @Query(() => [Tag])

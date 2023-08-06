@@ -1,4 +1,3 @@
-import { Service } from 'typedi';
 import pino from 'pino';
 import type { Logger } from 'pino';
 import { tmpdir } from 'os';
@@ -24,7 +23,6 @@ const transport = pino.transport({
   ],
 });
 const logger: Logger = pino(transport);
-@Service()
 export class LogService {
   log(msg: string) {
     if (logger) logger.info(msg);

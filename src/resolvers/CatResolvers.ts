@@ -1,12 +1,10 @@
 import { Arg, Authorized, Mutation, Query, Resolver } from 'type-graphql';
-import { Service } from 'typedi';
 import { Blog } from '../entities/blog';
 
 import { BlogModel, CategoryModel } from '../models';
 import { slugify } from '../utils/slugify';
 import { Category } from '../entities/category';
 
-@Service()
 @Resolver()
 class CatResolvers {
   @Query(() => [Category])

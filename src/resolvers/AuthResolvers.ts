@@ -14,7 +14,6 @@ import {
 } from 'type-graphql';
 
 import { TContext, UserPayload } from '../types';
-import { Service } from 'typedi';
 import { UserModel } from '../models';
 import sgMail from '@sendgrid/mail';
 import {
@@ -50,7 +49,6 @@ export class PasswordError extends ApolloError {
   }
 }
 
-@Service()
 @Resolver()
 class AuthResolvers {
   @Mutation(() => String)
@@ -122,25 +120,30 @@ class AuthResolvers {
     }
   }
 
-  @Mutation(()=>UserResponse)
-  async refreshToken(@Ctx() { req, res }: TContext) {
-    const token = req.cookies.botthk_refresh;
-    if (!token) {
-      return { ok: false, accessToken: '' };
-    }
-
+  @Mutation(() => UserResponse)
+  async refreshToken(
+    @Ctx() { req, res }: TContext,
+    @Arg('userId', { nullable: true }) userId?: string
+  ) {
     let payload: TContext['user'] = null;
-    try {
-      payload = verify(token, process.env.REFRESH_TOKEN_SECRET!) as UserPayload;
-    } catch (error) {
-      return { ok: false, accessToken: '' };
+    let user: User | null = null;
+    const token = req.cookies.botthk_refresh;
+    if (token) {
+      try {
+        payload = verify(
+          token,
+          process.env.REFRESH_TOKEN_SECRET!
+        ) as UserPayload;
+      } catch (error) {
+        return { ok: false, accessToken: '' };
+      }
+
+      user = await UserModel.findOne({ _id: payload._id });
+    } else if (userId) {
+      user = await UserModel.findOne({ _id: userId });
     }
 
-    const user = await UserModel.findOne({ _id: payload._id });
-
-    if (!user) return { ok: false, accessToken: '' };
-
-    if (user.tokenVersion !== payload.tokenVersion)
+    if (!user || (payload && user?.tokenVersion !== payload?.tokenVersion))
       return { ok: false, accessToken: '' };
 
     setRefreshToken(res, createRefreshToken(user));

@@ -13,7 +13,6 @@ import {
 
 import { User } from '../entities/user';
 import { TContext } from '../types';
-import { Service } from 'typedi';
 import { UserModel } from '../models';
 import { AuthenticationError } from 'apollo-server-express';
 import { isEmail, isEmpty } from 'class-validator';
@@ -24,7 +23,6 @@ import { Notification } from '../dtos/notification';
 import { FollowInfo } from '../dtos/followInfo';
 import { UserInfoResponse } from '../dtos/userInfoResponse';
 
-@Service()
 @Resolver()
 class UserResolvers {
   @Query(() => UserInfoResponse)
@@ -36,6 +34,7 @@ class UserResolvers {
       const user = await UserModel.findOne({ username });
       if (!user) throw new Error('user info not found');
       return {
+        _id:user._id.toString(),
         username: user.username,
         name: user.name,
         email: user.email,
@@ -56,7 +55,7 @@ class UserResolvers {
         name: { $regex: name, $options: 'i' },
       })
         .select(
-          'username name email profile about photo followingIds followerIds'
+          '_id username name email profile about photo followingIds followerIds'
         )
         .exec();
 

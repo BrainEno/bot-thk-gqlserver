@@ -247,6 +247,7 @@ query GetBlogById($blogId: String!) {
 
 query SearchUsers($name: String!) {
   searchUsers(name: $name) {
+    _id
     username
     name
     email
@@ -260,6 +261,7 @@ query SearchUsers($name: String!) {
 
 query GetUserInfo($username: String!) {
   getUserInfo(username: $username) {
+    _id
     createdAt
     email
     name
@@ -293,5 +295,53 @@ query GetFollowInfo($username: String) {
       followingIds
       followerIds
     }
+  }
+}
+
+query Conversations {
+  conversations {
+    latestMessage {
+      sender {
+        _id
+        name
+        username
+      }
+    }
+    createdAt
+    _id
+    messages {
+      body
+      sender {
+        _id
+        name
+        username
+        photo
+      }
+      createdAt
+    }
+    participants {
+      _id
+      user{
+        _id
+        name
+        photo
+      }
+      userId
+    }
+  }
+}
+
+query Messages($conversationId: String!) {
+  messages(conversationId: $conversationId) {
+    body
+    createdAt
+    sender {
+      _id
+      name
+      photo
+      username
+    }
+    senderId
+    _id
   }
 }

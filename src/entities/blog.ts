@@ -1,4 +1,4 @@
-import { prop, Ref } from '@typegoose/typegoose';
+import { modelOptions, prop, Ref } from '@typegoose/typegoose';
 import { MinLength } from 'class-validator';
 import { Field, InputType, ObjectType } from 'type-graphql';
 import { Category } from './category';
@@ -10,6 +10,12 @@ import { User } from './user';
 import { TimeStamps } from '@typegoose/typegoose/lib/defaultClasses';
 
 @ObjectType()
+@modelOptions({
+  schemaOptions: {
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true },
+  },
+})
 export class Blog extends TimeStamps {
   @Field(() => ObjectId)
   readonly _id: ObjectID;
@@ -25,11 +31,11 @@ export class Blog extends TimeStamps {
   @MinLength(1, { message: '标题不得为空' })
   title: string;
 
-  @prop({ type: () => String})
+  @prop({ type: () => String })
   @Field()
   slug: string;
 
-  @prop({ type: () => String, required: false, maxlength: 100 })
+  @prop({ type: () => String, required: false, maxlength: 100, trim: true })
   @Field({ nullable: true })
   description?: string;
 
@@ -41,7 +47,6 @@ export class Blog extends TimeStamps {
   @prop({ type: () => String, required: false })
   @Field()
   mtitle: string;
-
 
   @prop({ type: () => String, required: false })
   @Field({
@@ -59,7 +64,7 @@ export class Blog extends TimeStamps {
   @Field(() => [User], { defaultValue: [] as Ref<User>[] })
   likedBy?: Ref<User>[];
 
-  @prop({ autopopulate: true, ref: 'Comment', default: [] })
+  @prop({ autopopulate: true, ref: 'Comment', default: [] as Ref<Comment>[] })
   @Field(() => [Comment], { defaultValue: [] })
   comments?: Ref<Comment>[];
 
@@ -74,7 +79,7 @@ export class Blog extends TimeStamps {
   @Field(() => User)
   @prop({ ref: () => User, required: true })
   public author: Ref<User>;
-  
+
   @Field(() => Date)
   createdAt: Date;
 

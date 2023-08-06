@@ -27,8 +27,8 @@ mutation Logout {
   logout
 }
 
-mutation RefreshToken {
-  refreshToken {
+mutation RefreshToken($userId: String) {
+  refreshToken(userId: $userId) {
     ok
     accessToken
   }
@@ -89,4 +89,28 @@ mutation UnFollow($name: String!) {
   unFollow(name: $name)
 }
 
+mutation CreateConversation($participantIds: [String!]!) {
+  createConversation(participantIds: $participantIds)
+}
 
+mutation DeleteConversation($conversationId: String!) {
+  deleteConversation(conversationId: $conversationId)
+}
+
+mutation UpdateParticipants(
+  $participantIds: [String!]!
+  $conversationId: String!
+) {
+  updateParticipants(
+    participantIds: $participantIds
+    conversationId: $conversationId
+  )
+}
+
+mutation SendMessage(
+  $conversationId: String!
+  $senderId: String!
+  $body: String!
+) {
+  sendMessage(conversationId: $conversationId, senderId: $senderId, body: $body)
+}

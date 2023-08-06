@@ -18,7 +18,6 @@ import { isEmpty } from 'class-validator';
 import { TContext } from '../types';
 import { smartTrim } from '../utils/smartTrim';
 import { NewBlogResponse } from '../dtos/newBlogResponse';
-import { Service } from 'typedi';
 import { slugify } from '../utils/slugify';
 import mongoose from 'mongoose';
 import { Topic } from '../topic';
@@ -26,7 +25,6 @@ import { NewBlogPayload } from '../interfaces/notification.interface';
 import shortid from 'shortid';
 import { Notification } from '../dtos/notification';
 
-@Service()
 @Resolver()
 class BlogResolvers {
   /**

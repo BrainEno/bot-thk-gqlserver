@@ -67,9 +67,8 @@ const main = async () => {
   const httpServer = http.createServer(app);
 
   try {
-    mongoose
-      .connect(MONGODB_URI)
-      .then(() => logger.log('***MongoDB connected***'));
+    await mongoose.connect(MONGODB_URI);
+    logger.log('***MongoDB connected***');
   } catch (error) {
     console.log('Error connecting to MongoDB:', error?.message);
   }
@@ -84,7 +83,7 @@ const main = async () => {
       return error;
     },
     csrfPrevention: true,
-    introspection: true,
+    introspection: process.env.NODE_ENV !== 'production',
     cache: new InMemoryLRUCache({
       maxSize: Math.pow(2, 20) * 100,
       ttl: 300_000,

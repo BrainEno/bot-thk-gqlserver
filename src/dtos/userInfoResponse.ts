@@ -3,6 +3,9 @@ import { ObjectType, Field } from 'type-graphql';
 @ObjectType()
 export class UserInfoResponse {
   @Field()
+  _id: string;
+
+  @Field()
   username: string;
 
   @Field()

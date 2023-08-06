@@ -6,9 +6,10 @@ export const smartTrim = (
   delim: string,
   appendix: string
 ): string => {
-  str = convertToStr(str);
+  str = convertToStr(str).trim();
 
   if (str.length <= length) return str;
+  
 
   let trimmedStr = str.substring(0, length + delim.length);
 
