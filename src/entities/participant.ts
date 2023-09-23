@@ -1,4 +1,4 @@
-import { pre, prop, Ref } from '@typegoose/typegoose';
+import {  prop, Ref } from '@typegoose/typegoose';
 import { ObjectId } from 'bson';
 import { ObjectId as ObjectID } from 'mongoose';
 import { Field, ObjectType } from 'type-graphql';
@@ -7,10 +7,6 @@ import { User } from './user';
 import { Conversation } from './conversation';
 
 @ObjectType()
-@pre<Participant>('save', function () {
-  this.userId = this.user?._id?.toString();
-  this.conversationId = this.conversation?._id?.toString();
-})
 export class Participant {
   @Field(() => ObjectId)
   readonly _id: ObjectID;

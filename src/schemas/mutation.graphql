@@ -13,6 +13,8 @@ mutation Register(
 mutation Login($password: String!, $email: String!) {
   login(password: $password, email: $email) {
     accessToken
+    refreshToken
+    accessTokenExpiry
     ok
   }
 }
@@ -27,12 +29,15 @@ mutation Logout {
   logout
 }
 
-mutation RefreshToken($userId: String) {
-  refreshToken(userId: $userId) {
-    ok
+mutation RefreshToken($refreshToken: String!) {
+  refreshToken(refreshToken: $refreshToken) {
     accessToken
+    accessTokenExpiry
+    refreshToken
+    ok
   }
 }
+
 
 mutation EditProfile(
   $about: String
@@ -89,8 +94,8 @@ mutation UnFollow($name: String!) {
   unFollow(name: $name)
 }
 
-mutation CreateConversation($participantIds: [String!]!) {
-  createConversation(participantIds: $participantIds)
+mutation CreateConversation($participantUserIds: [String!]!) {
+  createConversation(participantUserIds: $participantUserIds)
 }
 
 mutation DeleteConversation($conversationId: String!) {

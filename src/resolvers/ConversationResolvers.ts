@@ -88,7 +88,8 @@ export default class ConversationResolvers {
 
   @Mutation(() => String)
   async createConversation(
-    @Arg('participantIds', () => [String]) participantIds: Array<string>,
+    @Arg('participantUserIds', () => [String])
+    participantUserIds: Array<string>,
     @Ctx() { user }: TContext,
     @PubSub(Topic.ConversationCreated)
     notifyAboutNewConversation: Publisher<ConversationCreatedPayload>
@@ -99,7 +100,7 @@ export default class ConversationResolvers {
 
     try {
       const participants = await Promise.all(
-        participantIds.map(async (id) => {
+        participantUserIds.map(async (id) => {
           const user = await UserModel.findOne({ _id: id })
             .select('_id')
             .exec();
@@ -127,6 +128,8 @@ export default class ConversationResolvers {
       await Promise.all(
         participants.map(async (p) => {
           p.conversation = conversation;
+          p.conversationId = conversation._id.toString();
+          p.userId = p.user._id.toString();
           await p.save();
         })
       );
@@ -313,6 +316,8 @@ export default class ConversationResolvers {
               { _id: p._id },
               {
                 conversation: conversation._id,
+                conversationId: conversation._id.toString(),
+                userId: p.user._id.toString(),
               }
             );
           })

@@ -47,6 +47,7 @@ export default class MessageResolvers {
 
     const participants = await ParticipantModel.find({
       _id: { $in: conversation.participants },
+      conversationId
     });
 
     const allowToView = userIsConversationParticipant(
@@ -55,7 +56,7 @@ export default class MessageResolvers {
     );
 
     if (!allowToView) {
-      throw new Error('Not Authorized');
+      throw new Error('Access Denied');
     }
 
     try {
@@ -86,7 +87,7 @@ export default class MessageResolvers {
       throw new AuthenticationError('Not authorized');
     }
 
-    console.log(body);
+    // console.log(body);
 
     const { _id: userId } = user;
 
@@ -119,6 +120,7 @@ export default class MessageResolvers {
 
       const notMeParticipants = await ParticipantModel.find({
         userId: { $ne: userId },
+        conversationId
       });
 
       if (!notMeParticipants)
@@ -140,7 +142,7 @@ export default class MessageResolvers {
       if (!conversationInDB)
         throw new GraphQLError('Conversation does not exist');
 
-      const conversation=await conversationInDB.updateOne({
+      const conversation = await conversationInDB.updateOne({
         latestMessage: newMessage._id,
         latestMessageId: newMessage._id.toString(),
         participants: participants.map((p) => p._id),

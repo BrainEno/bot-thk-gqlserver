@@ -132,8 +132,8 @@ type Message {
 
 type Mutation {
   register(password: String!, email: String!, name: String!): String!
-  login(password: String!, email: String!): UserResponse!
-  refreshToken(userId: String): UserResponse!
+  login(password: String!, email: String!): LoginResponse!
+  refreshToken(refreshToken: String!): LoginResponse!
   logout: Boolean!
   forgotPassword(email: String!): String!
   resetPassword(password: String!, username: String!): Boolean!
@@ -148,16 +148,18 @@ type Mutation {
   editProfile(about: String, photo: String, email: String, name: String): Boolean!
   newTag(tagName: String!): Boolean!
   deleteTag(id: String!): Boolean!
-  createConversation(participantIds: [String!]!): String!
+  createConversation(participantUserIds: [String!]!): String!
   markConversationAsRead(conversation: String!, userId: String!): Boolean!
   deleteConversation(conversationId: String!): Boolean!
   updateParticipants(participantIds: [String!]!, conversationId: String!): Boolean!
   sendMessage(conversationId: String!, senderId: String!, body: String!): Boolean!
 }
 
-type UserResponse {
+type LoginResponse {
   ok: Boolean!
   accessToken: String!
+  refreshToken: String!
+  accessTokenExpiry: Float!
 }
 
 type NewBlogResponse {

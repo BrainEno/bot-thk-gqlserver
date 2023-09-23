@@ -1,7 +1,7 @@
 import { ApolloError, AuthenticationError } from 'apollo-server-errors';
 import { isEmail, isEmpty } from 'class-validator';
 import dotenv from 'dotenv';
-import jwt, { verify } from 'jsonwebtoken';
+import jwt from 'jsonwebtoken';
 import path from 'path';
 import shortId from 'shortid';
 import {
@@ -13,7 +13,7 @@ import {
   UseMiddleware,
 } from 'type-graphql';
 
-import { TContext, UserPayload } from '../types';
+import { TContext } from '../types';
 import { UserModel } from '../models';
 import sgMail from '@sendgrid/mail';
 import {
@@ -23,7 +23,7 @@ import {
   createAccessToken,
 } from '../utils/sendRefreshToken';
 import { isAdmin } from '../middlewares/authChecker';
-import { UserResponse } from '../dtos/userResponse';
+import { LoginResponse } from '../dtos/LoginResponse';
 import { User } from '../entities/user';
 
 dotenv.config({ path: path.join(__dirname, '../.env.local') });
@@ -88,12 +88,12 @@ class AuthResolvers {
     }
   }
 
-  @Mutation(() => UserResponse)
+  @Mutation(() => LoginResponse)
   async login(
     @Arg('email') email: string,
     @Arg('password') password: string,
     @Ctx() context: TContext
-  ): Promise<UserResponse> {
+  ): Promise<LoginResponse> {
     try {
       if (isEmpty(email)) throw new EmailError('邮箱不得为空');
       if (isEmpty(password)) throw new PasswordError('密码不得为空');
@@ -104,7 +104,7 @@ class AuthResolvers {
       if (!passwordMatches)
         throw new PasswordError('邮箱和密码不匹配，请重新输入');
 
-      const accessToken = createAccessToken(user);
+      const { accessToken, accessTokenExpiry } = createAccessToken(user);
       const refreshToken = createRefreshToken(user);
 
       setRefreshToken(context.res, refreshToken);
@@ -112,7 +112,9 @@ class AuthResolvers {
 
       return {
         ok: true,
-        accessToken: accessToken,
+        accessToken,
+        refreshToken,
+        accessTokenExpiry,
       };
     } catch (error) {
       console.log(error);
@@ -120,54 +122,57 @@ class AuthResolvers {
     }
   }
 
-  @Mutation(() => UserResponse)
-  async refreshToken(
-    @Ctx() { req, res }: TContext,
-    @Arg('userId', { nullable: true }) userId?: string
-  ) {
-    let payload: TContext['user'] = null;
-    let user: User | null = null;
-    const token = req.cookies.botthk_refresh;
-    if (token) {
-      try {
-        payload = verify(
-          token,
-          process.env.REFRESH_TOKEN_SECRET!
-        ) as UserPayload;
-      } catch (error) {
-        return { ok: false, accessToken: '' };
-      }
+  @Mutation(() => LoginResponse)
+  async refreshToken(@Arg('refreshToken') refreshToken: string) {
+    const payload = jwt.verify(
+      refreshToken,
+      process.env.REFRESH_TOKEN_SECRET as string
+    ) as User;
 
-      user = await UserModel.findOne({ _id: payload._id });
-    } else if (userId) {
-      user = await UserModel.findOne({ _id: userId });
+    if (payload) {
+      const user = await UserModel.findOne({ _id: payload._id });
+      //check if token version is valid
+      if (user && user?.tokenVersion === payload.tokenVersion) {
+        const { accessToken, accessTokenExpiry } = createAccessToken(user);
+        const newRefreshToken = createRefreshToken(user);
+
+        console.log('refresh token expires at:', accessToken);
+
+        return {
+          accessToken,
+          accessTokenExpiry,
+          refreshToken: newRefreshToken,
+          ok: true,
+        };
+      }
     }
 
-    if (!user || (payload && user?.tokenVersion !== payload?.tokenVersion))
-      return { ok: false, accessToken: '' };
-
-    setRefreshToken(res, createRefreshToken(user));
-
-    return { ok: true, accessToken: createAccessToken(user) };
+    return {
+      accessToken: '',
+      accessTokenExpiry: -1,
+      refreshToken: '',
+      ok: false,
+    };
   }
 
   @Query(() => User, { nullable: true })
   async currentUser(@Ctx() { res, user }: TContext): Promise<User | null> {
-    let payload = user;
 
-    if (!payload) {
+    if (!user) {
       return null;
     }
 
     try {
       const curUser = await UserModel.findOne({
-        _id: payload._id,
-        tokenVersion: payload.tokenVersion,
+        _id: user._id,
+        tokenVersion: user.tokenVersion,
       });
 
       if (curUser) {
+        const { accessToken } = createAccessToken(curUser);
+
         setRefreshToken(res, createRefreshToken(curUser));
-        setAccessToken(res, createAccessToken(curUser));
+        setAccessToken(res, accessToken);
         return curUser;
       }
       return null;
@@ -181,7 +186,7 @@ class AuthResolvers {
   async logout(@Ctx() { req, res }: TContext): Promise<boolean> {
     if (req.headers.cookie) {
       req.headers.authorization = '';
-      res.clearCookie('botthk_access');
+      res.clearCookie('botthk');
       res.clearCookie('botthk_refresh');
 
       return true;
