@@ -26,7 +26,7 @@ import {
 import cookieParser from 'cookie-parser';
 import { TContext } from './types';
 import cors from 'cors';
-import { context } from './context/typeGraphQLContext';
+import { context, getDynamicContext } from './context/typeGraphQLContext';
 import { LogService } from './services/LogService';
 import { ArgumentValidationError } from 'type-graphql';
 
@@ -48,12 +48,23 @@ const main = async () => {
   const port = parseInt(process.env.PORT!, 10) || 4001;
   const schema = createSchema();
 
-  const handler = createHandler({ schema });
+  const handler = createHandler<Partial<TContext>>({
+    schema,
+    context: async (req, params) => {
+      return await getDynamicContext(req, params);
+    },
+  });
   const app = express();
 
   app.use(cookieParser());
   app.use(cors(corsOptions));
-  app.use('/graphql/stream', handler);
+  app.use('/graphql/stream', async (req, res) => {
+    try {
+      await handler(req, res);
+    } catch (err) {
+      console.error(err);
+    }
+  });
 
   app.get('/', (_req, res) => {
     const data = {

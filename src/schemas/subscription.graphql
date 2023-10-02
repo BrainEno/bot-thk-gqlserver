@@ -15,3 +15,70 @@ subscription UserFollowed($name: String!) {
     message
   }
 }
+
+subscription ConversationCreated {
+  conversationCreated {
+    _id
+    createdAt
+    latestMessage {
+      body
+      senderId
+    }
+    participantUserIds
+    participants {
+      hasSeenLatestMessage
+      userId
+      conversationId
+    }
+    latestMessageId
+  }
+}
+
+subscription ConversationDeleted {
+  conversationDeleted {
+    participantUserIds
+    participants {
+      conversation {
+        latestMessageId
+      }
+      conversationId
+      hasSeenLatestMessage
+      userId
+    }
+    latestMessageId
+    _id
+  }
+}
+
+subscription ConversationUpdated {
+  conversationUpdated {
+    addedUserIds
+    removedUserIds
+    conversation {
+      participantUserIds
+      participants {
+        hasSeenLatestMessage
+        conversationId
+        _id
+      }
+      latestMessageId
+      _id
+    }
+  }
+}
+
+subscription MessageSent {
+  messageSent {
+    body
+    createdAt
+    sender {
+      _id
+      name
+      username
+      photo
+    }
+    senderId
+    updatedAt
+    _id
+  }
+}

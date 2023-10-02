@@ -23,6 +23,7 @@ import {
 import { Topic } from '../topic';
 import { ConversationUpdatedPayload } from '../interfaces/conversation.interface';
 import mongoose from 'mongoose';
+import { Conversation } from '../entities/conversation';
 
 @Resolver()
 export default class MessageResolvers {
@@ -47,7 +48,7 @@ export default class MessageResolvers {
 
     const participants = await ParticipantModel.find({
       _id: { $in: conversation.participants },
-      conversationId
+      conversationId,
     });
 
     const allowToView = userIsConversationParticipant(
@@ -120,7 +121,7 @@ export default class MessageResolvers {
 
       const notMeParticipants = await ParticipantModel.find({
         userId: { $ne: userId },
-        conversationId
+        conversationId,
       });
 
       if (!notMeParticipants)
@@ -142,17 +143,21 @@ export default class MessageResolvers {
       if (!conversationInDB)
         throw new GraphQLError('Conversation does not exist');
 
-      const conversation = await conversationInDB.updateOne({
+      await conversationInDB.updateOne({
         latestMessage: newMessage._id,
         latestMessageId: newMessage._id.toString(),
         participants: participants.map((p) => p._id),
         messages,
       });
 
+      const newConversation = await ConversationModel.findOne({
+        _id: conversationId,
+      }) as Conversation;
+
       notifyMessageSent({ messageSent: newMessage });
       notifyConversationUpdated({
         conversationUpdated: {
-          conversation,
+          conversation: newConversation,
         },
       });
 
@@ -163,13 +168,13 @@ export default class MessageResolvers {
     }
   }
 
-  @Subscription(() => Boolean, {
+  @Subscription(() => Message, {
     topics: Topic.MessageSent,
+    filter: ({ payload, args: { conversationId } }) => {
+      return payload.messageSent.conversationId === conversationId;
+    },
   })
-  messageSent(
-    @Root() payload: MessageSentPayload,
-    @Arg('conversationId') conversationId: string
-  ) {
-    return payload.messageSent.conversationId === conversationId;
+  messageSent(@Root() payload: MessageSentPayload) {
+    return payload.messageSent;
   }
 }

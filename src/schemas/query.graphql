@@ -324,9 +324,12 @@ query Conversations {
       user{
         _id
         name
+        username
         photo
       }
+      conversationId
       userId
+      hasSeenLatestMessage
     }
   }
 }

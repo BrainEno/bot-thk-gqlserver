@@ -27,6 +27,7 @@ import {
 import { Conversation } from '../entities/conversation';
 import dotenv from 'dotenv';
 import mongoose, { Types } from 'mongoose';
+import { ConversationUpdated } from '../dtos/conversations';
 
 dotenv.config();
 
@@ -47,7 +48,11 @@ export default class ConversationResolvers {
           model: 'Participant',
           populate: [
             '_id userId',
-            { path: 'user', model: 'User', populate: ['name _id photo'] },
+            {
+              path: 'user',
+              model: 'User',
+              populate: ['name _id photo hasSeenLatestMessage '],
+            },
           ],
         })
         .populate({
@@ -122,8 +127,9 @@ export default class ConversationResolvers {
         participantUserIds: participants.map((p) => p.userId),
       });
 
-      await conversation.populate('participants', 'user userId');
-      await conversation.populate('latestMessage', 'sender');
+      await conversation.populate('participantUserIds');
+
+      console.log(conversation);
 
       await Promise.all(
         participants.map(async (p) => {
@@ -146,7 +152,7 @@ export default class ConversationResolvers {
   @Mutation(() => Boolean)
   async markConversationAsRead(
     @Arg('userId') userId: string,
-    @Arg('conversation') conversationId: string
+    @Arg('conversationId') conversationId: string
   ): Promise<boolean> {
     try {
       await ParticipantModel.updateMany(
@@ -258,6 +264,7 @@ export default class ConversationResolvers {
 
         const participants = await ParticipantModel.find({
           userId: { $in: participantIds },
+          conversationId
         });
 
         const conversation = await ConversationModel.findOneAndUpdate(
@@ -267,7 +274,11 @@ export default class ConversationResolvers {
             participantUserIds: participants.map((p) => p.userId),
           },
           { new: true }
-        );
+        )
+          .populate('participantUserIds')
+          .populate('latestMessage', 'sender')
+          .select('_id participantUserIds messages latestMessage createdAt')
+          .exec();
 
         removeUpdate = conversation as Conversation;
       }
@@ -303,9 +314,9 @@ export default class ConversationResolvers {
         const conversation = await ConversationModel.findOne({
           _id: conversationId,
         })
-          .populate('participants', 'user userId')
+          .populate('participantUserIds')
           .populate('latestMessage', 'sender')
-          .select('_id participants messages latestMessage createdAt')
+          .select('_id participantUserIds messages latestMessage createdAt')
           .exec();
 
         if (!conversation) return;
@@ -345,79 +356,116 @@ export default class ConversationResolvers {
     }
   }
 
-  @Subscription(() => Boolean, {
+  @Subscription(() => Conversation, {
     topics: Topic.ConversationCreated,
+    filter: ({
+      payload,
+      context,
+    }: {
+      payload: ConversationCreatedPayload;
+      context: TContext;
+    }) => {
+      if (!context.user) {
+        throw new AuthenticationError('Not authorized');
+      }
+
+      const {
+        conversationCreated: { participantUserIds },
+      } = payload;
+
+      //return if current user is conversation participant
+      return !!participantUserIds.find(
+        (pId: string) => pId === context?.user?._id.toString()
+      );
+    },
   })
   conversationCreated(
-    @Root() payload: ConversationCreatedPayload,
-    @Ctx() { user }: TContext
-  ) {
-    if (!user) {
-      throw new AuthenticationError('Not authorized');
-    }
-
-    const {
-      conversationCreated: { participants },
-    } = payload;
-
-    //return if current user is conversation participant
-    return !!participants.find((p) => p.toString() === user._id.toString());
+    @Root() payload: ConversationCreatedPayload
+  ): ConversationCreatedPayload['conversationCreated'] {
+    return payload.conversationCreated;
   }
 
-  @Subscription(() => Boolean, {
+  @Subscription(() => ConversationUpdated, {
     topics: Topic.ConversationUpdated,
+    filter: ({
+      payload,
+      context,
+    }: {
+      payload: ConversationUpdatedPayload;
+      context: TContext;
+    }) => {
+      if (!context?.user) {
+        throw new AuthenticationError('Not authorized');
+      }
+
+      console.log('updating payload in filter:', payload.conversationUpdated);
+
+      const {
+        conversationUpdated: {
+          conversation: { participantUserIds },
+          removedUserIds,
+        },
+      } = payload;
+
+      const userIsParticipant = !!participantUserIds?.find(
+        (id: string) => id === context?.user?._id.toString()
+      );
+
+      const latestMessage = MessageModel.findOne({
+        _id: payload.conversationUpdated.conversation.latestMessage,
+      });
+
+      const userSentLastestMessage =
+        latestMessage?.senderId === context.user._id;
+
+      const userIsBeingRemoved =
+        removedUserIds &&
+        Boolean(
+          removedUserIds.find(
+            (id: string) => id === context?.user?._id.toString()
+          )
+        );
+
+      return Boolean(
+        (userIsParticipant && !userSentLastestMessage) ||
+          userSentLastestMessage ||
+          userIsBeingRemoved
+      );
+    },
   })
   conversationUpdated(
-    @Root() payload: ConversationUpdatedPayload,
-    @Ctx() { user }: TContext
-  ) {
-    if (!user) {
-      throw new AuthenticationError('Not authorized');
-    }
-
-    const {
-      conversationUpdated: {
-        conversation: { participants },
-        removedUserIds,
-      },
-    } = payload;
-
-    const userIsParticipant = !!participants.find(
-      (p) => p.toString() === user._id.toString()
-    );
-
-    const latestMessage = MessageModel.findOne({
-      _id: payload.conversationUpdated.conversation.latestMessage,
-    });
-
-    const userSentLastestMessage = latestMessage?.senderId === user._id;
-
-    const userIsBeingRemoved =
-      removedUserIds &&
-      Boolean(removedUserIds.find((id) => id === user._id.toString()));
-
-    return (
-      (userIsParticipant && !userSentLastestMessage) ||
-      userSentLastestMessage ||
-      userIsBeingRemoved
-    );
+    @Root() payload: ConversationUpdatedPayload
+  ): ConversationUpdatedPayload['conversationUpdated'] {
+    return payload.conversationUpdated;
   }
 
-  @Subscription(() => Boolean, {
+  @Subscription(() => Conversation, {
     topics: Topic.ConversationDeleted,
+    filter: ({
+      payload,
+      context,
+    }: {
+      payload: ConversationDeletedPayload;
+      context: TContext;
+    }) => {
+      if (!context?.user) {
+        throw new AuthenticationError('Not authorized');
+      }
+
+      console.log('deleted payload in filter:', payload.conversationDeleted);
+      const {
+        conversationDeleted: { participantUserIds },
+      } = payload;
+
+      return !!participantUserIds.find(
+        (pId: string) => pId === context?.user?._id.toString()
+      );
+    },
   })
   conversationDeleted(
-    @Root() payload: ConversationDeletedPayload,
-    @Ctx() { user }: TContext
-  ) {
-    if (!user) {
-      throw new AuthenticationError('Not authorized');
-    }
-
-    const {
-      conversationDeleted: { participants },
-    } = payload;
-
-    return !!participants.find((p) => p.toString() === user._id.toString());
+    @Root() { conversationDeleted }: ConversationDeletedPayload
+  ): ConversationDeletedPayload['conversationDeleted'] {
+    console.log('in del sub res:',conversationDeleted)
+    return conversationDeleted;
   }
 }

@@ -119,3 +119,7 @@ mutation SendMessage(
 ) {
   sendMessage(conversationId: $conversationId, senderId: $senderId, body: $body)
 }
+
+mutation MarkConversationAsRead($conversationId: String!, $userId: String!) {
+  markConversationAsRead(conversationId: $conversationId, userId: $userId)
+}

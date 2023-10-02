@@ -149,7 +149,7 @@ type Mutation {
   newTag(tagName: String!): Boolean!
   deleteTag(id: String!): Boolean!
   createConversation(participantUserIds: [String!]!): String!
-  markConversationAsRead(conversation: String!, userId: String!): Boolean!
+  markConversationAsRead(conversationId: String!, userId: String!): Boolean!
   deleteConversation(conversationId: String!): Boolean!
   updateParticipants(participantIds: [String!]!, conversationId: String!): Boolean!
   sendMessage(conversationId: String!, senderId: String!, body: String!): Boolean!
@@ -176,10 +176,10 @@ input BlogInput {
 type Subscription {
   blogPublished(followingIds: [String!]!): Notification!
   userFollowed(name: String!): Notification!
-  conversationCreated: Boolean!
-  conversationUpdated: Boolean!
-  conversationDeleted: Boolean!
-  messageSent(conversationId: String!): Boolean!
+  conversationCreated: Conversation!
+  conversationUpdated: ConversationUpdated!
+  conversationDeleted: Conversation!
+  messageSent: Message!
 }
 
 type Notification {
@@ -187,4 +187,10 @@ type Notification {
   message: String!
   linkString: String!
   dateString: String!
+}
+
+type ConversationUpdated {
+  conversation: Conversation!
+  addedUserIds: [String!]
+  removedUserIds: [String!]
 }
