@@ -1,4 +1,4 @@
-import { AuthenticationError } from 'apollo-server-express';
+import { AuthenticationError } from "apollo-server-express";
 import {
   Resolver,
   Query,
@@ -10,40 +10,42 @@ import {
   Subscription,
   Root,
   Args,
-} from 'type-graphql';
-import { Message } from '../entities/message';
-import { TContext } from '../types';
-import { ConversationModel, MessageModel, ParticipantModel } from '../models';
-import { GraphQLError } from 'graphql';
-import { userIsConversationParticipant } from '../utils/userIsConversationParticipant';
+} from "type-graphql";
+import { Message } from "../entities/message";
+import { TContext } from "../types";
+import { ConversationModel, MessageModel, ParticipantModel } from "../models";
+import { GraphQLError } from "graphql";
+import { userIsConversationParticipant } from "../utils/userIsConversationParticipant";
 import {
   SendMessageArgs,
   MessageSentPayload,
-} from '../interfaces/message.interface';
-import { Topic } from '../topic';
-import { ConversationUpdatedPayload } from '../interfaces/conversation.interface';
-import mongoose from 'mongoose';
-import { Conversation } from '../entities/conversation';
+} from "../interfaces/message.interface";
+import { Topic } from "../topic";
+import {
+  ConversationUpdatedPayload,
+  ConversationPopulated,
+} from "../interfaces/conversation.interface";
+import mongoose from "mongoose";
 
 @Resolver()
 export default class MessageResolvers {
   @Query(() => [Message])
   async messages(
-    @Arg('conversationId') conversationId: string,
+    @Arg("conversationId") conversationId: string,
     @Ctx() { user }: TContext
   ) {
     if (!user) {
-      throw new AuthenticationError('Not authorized');
+      throw new AuthenticationError("Not authorized");
     }
 
     const conversation = await ConversationModel.findOne({
       _id: conversationId,
     })
-      .populate('participants', 'userId')
+      .populate("participants", "userId")
       .exec();
 
     if (!conversation) {
-      throw new GraphQLError('Conversation Not Found');
+      throw new GraphQLError("Conversation Not Found");
     }
 
     const participants = await ParticipantModel.find({
@@ -57,20 +59,26 @@ export default class MessageResolvers {
     );
 
     if (!allowToView) {
-      throw new Error('Access Denied');
+      throw new Error("Access Denied");
     }
 
     try {
       const messages = await MessageModel.find({
         conversationId,
       })
-        .populate('sender', '_id username name photo username')
-        .sort({ createdAt: 'desc' })
+        .populate(["_id body senderId createdAt"])
+        .populate({
+          path: "sender",
+          model: "User",
+          populate: ["_id name username photo"],
+        })
+        .select("_id createdAt senderId sender body")
+        .sort({ createdAt: "desc" })
         .exec();
 
       return messages;
     } catch (error) {
-      console.log('messages error', error);
+      console.log("messages error", error);
       throw new GraphQLError(error?.message);
     }
   }
@@ -85,7 +93,7 @@ export default class MessageResolvers {
     notifyConversationUpdated: Publisher<ConversationUpdatedPayload>
   ) {
     if (!user) {
-      throw new AuthenticationError('Not authorized');
+      throw new AuthenticationError("Not authorized");
     }
 
     // console.log(body);
@@ -96,7 +104,7 @@ export default class MessageResolvers {
       _id: conversationId,
     });
 
-    if (!conversation) throw new GraphQLError('Conversation Not Found');
+    if (!conversation) throw new GraphQLError("Conversation Not Found");
 
     try {
       const newMessage = await MessageModel.create({
@@ -107,14 +115,14 @@ export default class MessageResolvers {
         body,
       });
 
-      await newMessage.populate('sender', '_id username name');
+      await newMessage.populate("sender", "_id username name photo");
 
       const participant = await ParticipantModel.findOne({
         userId,
         conversationId,
       });
 
-      if (!participant) throw new GraphQLError('Participant does not exist');
+      if (!participant) throw new GraphQLError("Participant does not exist");
 
       participant.hasSeenLatestMessage = true;
       await participant.save();
@@ -125,7 +133,7 @@ export default class MessageResolvers {
       });
 
       if (!notMeParticipants)
-        throw new GraphQLError('Participant does not exist');
+        throw new GraphQLError("Participant does not exist");
 
       notMeParticipants.forEach(async (np) => {
         np.hasSeenLatestMessage = false;
@@ -141,7 +149,7 @@ export default class MessageResolvers {
       const messages = [newMessage._id, ...(conversationInDB?.messages || [])];
 
       if (!conversationInDB)
-        throw new GraphQLError('Conversation does not exist');
+        throw new GraphQLError("Conversation does not exist");
 
       await conversationInDB.updateOne({
         latestMessage: newMessage._id,
@@ -150,9 +158,49 @@ export default class MessageResolvers {
         messages,
       });
 
-      const newConversation = await ConversationModel.findOne({
+      const newConversation = (await ConversationModel.findOne({
         _id: conversationId,
-      }) as Conversation;
+      })
+        .populate({
+          path: "participants",
+          model: "Participant",
+          populate: [
+            "_id userId hasSeenLatestMessage",
+            {
+              path: "user",
+              model: "User",
+              populate: ["name _id photo"],
+            },
+          ],
+        })
+        .populate({
+          path: "latestMessage",
+          model: "Message",
+          populate: [
+            "body createdAt senderId",
+            {
+              path: "sender",
+              model: "User",
+              populate: ["username name _id photo"],
+            },
+          ],
+        })
+        .populate({
+          path: "messages",
+          model: "Message",
+          populate: [
+            "body createdAt senderId",
+            {
+              path: "sender",
+              model: "User",
+              populate: ["_id name username photo"],
+            },
+          ],
+        })
+        .select(
+          "_id participantUserIds participants messages latestMessage latestMessageId createdAt updatedAt"
+        )
+        .exec()) as unknown as ConversationPopulated;
 
       notifyMessageSent({ messageSent: newMessage });
       notifyConversationUpdated({
@@ -163,8 +211,8 @@ export default class MessageResolvers {
 
       return true;
     } catch (error) {
-      console.log('sendMessage error', error);
-      throw new GraphQLError('Error sending message');
+      console.log("sendMessage error", error);
+      throw new GraphQLError("Error sending message");
     }
   }
 

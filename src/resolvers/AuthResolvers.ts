@@ -1,9 +1,9 @@
-import { ApolloError, AuthenticationError } from 'apollo-server-errors';
-import { isEmail, isEmpty } from 'class-validator';
-import dotenv from 'dotenv';
-import jwt from 'jsonwebtoken';
-import path from 'path';
-import shortId from 'shortid';
+import { ApolloError, AuthenticationError } from "apollo-server-errors";
+import { isEmail, isEmpty } from "class-validator";
+import dotenv from "dotenv";
+import jwt from "jsonwebtoken";
+import path from "path";
+import shortId from "shortid";
 import {
   Arg,
   Ctx,
@@ -11,41 +11,41 @@ import {
   Query,
   Resolver,
   UseMiddleware,
-} from 'type-graphql';
+} from "type-graphql";
 
-import { TContext } from '../types';
-import { UserModel } from '../models';
-import sgMail from '@sendgrid/mail';
+import { TContext } from "../types";
+import { UserModel } from "../models";
+import sgMail from "@sendgrid/mail";
 import {
   setRefreshToken,
   createRefreshToken,
   setAccessToken,
   createAccessToken,
-} from '../utils/sendRefreshToken';
-import { isAdmin } from '../middlewares/authChecker';
-import { LoginResponse } from '../dtos/LoginResponse';
-import { User } from '../entities/user';
+} from "../utils/sendRefreshToken";
+import { isAdmin } from "../middlewares/authChecker";
+import { LoginResponse } from "../dtos/LoginResponse";
+import { User } from "../entities/user";
 
-dotenv.config({ path: path.join(__dirname, '../.env.local') });
+dotenv.config({ path: path.join(__dirname, "../.env.local") });
 
 export class EmailError extends ApolloError {
   constructor(message: string) {
-    super(message, 'INVALID_EMAIL');
-    Object.defineProperty(this, 'name', { value: 'email' });
+    super(message, "INVALID_EMAIL");
+    Object.defineProperty(this, "name", { value: "email" });
   }
 }
 
 export class UsernameError extends ApolloError {
   constructor(message: string) {
-    super(message, 'INVALID_USERNAME');
-    Object.defineProperty(this, 'name', { value: 'username' });
+    super(message, "INVALID_USERNAME");
+    Object.defineProperty(this, "name", { value: "username" });
   }
 }
 
 export class PasswordError extends ApolloError {
   constructor(message: string) {
-    super(message, 'INVALID_PASSWORD');
-    Object.defineProperty(this, 'name', { value: 'password' });
+    super(message, "INVALID_PASSWORD");
+    Object.defineProperty(this, "name", { value: "password" });
   }
 }
 
@@ -53,20 +53,20 @@ export class PasswordError extends ApolloError {
 class AuthResolvers {
   @Mutation(() => String)
   async register(
-    @Arg('name') name: string,
-    @Arg('email') email: string,
-    @Arg('password') password: string
+    @Arg("name") name: string,
+    @Arg("email") email: string,
+    @Arg("password") password: string
   ): Promise<string> {
     try {
       const isUserExist = await UserModel.findOne({
         name: name.toLowerCase(),
       });
-      if (isUserExist) throw new UsernameError('该昵称已被占用，换一个试试');
+      if (isUserExist) throw new UsernameError("该昵称已被占用，换一个试试");
 
       const isEmailExist = await UserModel.findOne({
         email: email.toLowerCase(),
       });
-      if (isEmailExist) throw new EmailError('该邮箱已注册，请登录或找回密码');
+      if (isEmailExist) throw new EmailError("该邮箱已注册，请登录或找回密码");
       const username = shortId.generate();
       const profile = `${process.env.CLIENT_URL}/profile/${username}`;
       const user = new UserModel({
@@ -75,7 +75,7 @@ class AuthResolvers {
         password,
         profile,
         username,
-        role: '0',
+        role: "0",
         tokenVersion: 0,
       });
 
@@ -90,26 +90,26 @@ class AuthResolvers {
 
   @Mutation(() => LoginResponse)
   async login(
-    @Arg('email') email: string,
-    @Arg('password') password: string,
+    @Arg("email") email: string,
+    @Arg("password") password: string,
     @Ctx() context: TContext
   ): Promise<LoginResponse> {
     try {
-      if (isEmpty(email)) throw new EmailError('邮箱不得为空');
-      if (isEmpty(password)) throw new PasswordError('密码不得为空');
+      if (isEmpty(email)) throw new EmailError("邮箱不得为空");
+      if (isEmpty(password)) throw new PasswordError("密码不得为空");
       const user = await UserModel.findOne({ email });
-      if (!user) throw new EmailError('未找到邮箱，请先注册');
+      if (!user) throw new EmailError("未找到邮箱，请先注册");
 
       const passwordMatches = user.authenticate(password);
       if (!passwordMatches)
-        throw new PasswordError('邮箱和密码不匹配，请重新输入');
+        throw new PasswordError("邮箱和密码不匹配，请重新输入");
 
       const { accessToken, accessTokenExpiry } = createAccessToken(user);
       const refreshToken = createRefreshToken(user);
 
       setRefreshToken(context.res, refreshToken);
       setAccessToken(context.res, accessToken);
-
+      console.log("login accessToken:", accessToken);
       return {
         ok: true,
         accessToken,
@@ -123,7 +123,7 @@ class AuthResolvers {
   }
 
   @Mutation(() => LoginResponse)
-  async refreshToken(@Arg('refreshToken') refreshToken: string) {
+  async refreshToken(@Arg("refreshToken") refreshToken: string) {
     const payload = jwt.verify(
       refreshToken,
       process.env.REFRESH_TOKEN_SECRET as string
@@ -134,9 +134,10 @@ class AuthResolvers {
       //check if token version is valid
       if (user && user?.tokenVersion === payload.tokenVersion) {
         const { accessToken, accessTokenExpiry } = createAccessToken(user);
+
         const newRefreshToken = createRefreshToken(user);
 
-        console.log('refresh token expires at:', accessToken);
+        console.log("refresh token accessToken:", accessToken);
 
         return {
           accessToken,
@@ -148,16 +149,15 @@ class AuthResolvers {
     }
 
     return {
-      accessToken: '',
+      accessToken: "",
       accessTokenExpiry: -1,
-      refreshToken: '',
+      refreshToken: "",
       ok: false,
     };
   }
 
   @Query(() => User, { nullable: true })
-  async currentUser(@Ctx() { res, user }: TContext): Promise<User | null> {
-
+  async currentUser(@Ctx() { user }: TContext): Promise<User | null> {
     if (!user) {
       return null;
     }
@@ -169,10 +169,6 @@ class AuthResolvers {
       });
 
       if (curUser) {
-        const { accessToken } = createAccessToken(curUser);
-
-        setRefreshToken(res, createRefreshToken(curUser));
-        setAccessToken(res, accessToken);
         return curUser;
       }
       return null;
@@ -185,9 +181,9 @@ class AuthResolvers {
   @Mutation(() => Boolean)
   async logout(@Ctx() { req, res }: TContext): Promise<boolean> {
     if (req.headers.cookie) {
-      req.headers.authorization = '';
-      res.clearCookie('botthk');
-      res.clearCookie('botthk_refresh');
+      req.headers.authorization = "";
+      res.clearCookie("botthk");
+      res.clearCookie("botthk_refresh");
 
       return true;
     }
@@ -195,12 +191,12 @@ class AuthResolvers {
   }
 
   @Mutation(() => String)
-  async forgotPassword(@Arg('email') email: string) {
+  async forgotPassword(@Arg("email") email: string) {
     const user = await UserModel.findOne({ email });
-    if (!user) throw new Error('User not found');
+    if (!user) throw new Error("User not found");
 
     const token = jwt.sign({ _id: user._id }, process.env.JWT_RESET_PASSWORD!, {
-      expiresIn: '10m',
+      expiresIn: "10m",
     });
     try {
       const emailData = genEmailData(email, token);
@@ -217,8 +213,8 @@ class AuthResolvers {
   @Mutation(() => Boolean)
   async resetPassword(
     @Ctx() { user }: TContext,
-    @Arg('username') username: string,
-    @Arg('password') password: string
+    @Arg("username") username: string,
+    @Arg("password") password: string
   ) {
     try {
       const authedUser = await UserModel.findOne({
@@ -243,7 +239,7 @@ class AuthResolvers {
   @UseMiddleware(isAdmin)
   @Mutation(() => Boolean)
   async revokeRefreshTokensForUser(
-    @Arg('userId', () => String) userId: string
+    @Arg("userId", () => String) userId: string
   ) {
     const user = await UserModel.findOne({ _id: userId });
     if (user) {
@@ -260,7 +256,7 @@ export default AuthResolvers;
 
 export const genEmailData = (email: string, token: string) => ({
   from: {
-    name: 'BOT THK',
+    name: "BOT THK",
     email: process.env.EMAIL_FROM as string,
   },
   to: email,

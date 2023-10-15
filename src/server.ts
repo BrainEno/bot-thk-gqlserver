@@ -1,47 +1,47 @@
-import 'reflect-metadata';
+import "reflect-metadata";
 
 import {
   ApolloServerPluginDrainHttpServer,
   ApolloServerPluginInlineTrace,
   ApolloServerPluginLandingPageLocalDefault,
-} from 'apollo-server-core';
-import { ApolloServer } from 'apollo-server-express';
-import dotenv from 'dotenv';
-import express from 'express';
-import http from 'http';
-import mongoose from 'mongoose';
-import { InMemoryLRUCache } from '@apollo/utils.keyvaluecache';
-import { createHandler } from 'graphql-sse/lib/use/express';
+} from "apollo-server-core";
+import { ApolloServer } from "apollo-server-express";
+import dotenv from "dotenv";
+import express from "express";
+import http from "http";
+import mongoose from "mongoose";
+import { InMemoryLRUCache } from "@apollo/utils.keyvaluecache";
+import { createHandler } from "graphql-sse/lib/use/express";
 
-import { createSchema } from './utils/createSchema';
+import { createSchema } from "./utils/createSchema";
 import {
   ApolloServerPlugin,
   GraphQLRequestContext,
-} from 'apollo-server-plugin-base';
+} from "apollo-server-plugin-base";
 import {
   getComplexity,
   simpleEstimator,
   fieldExtensionsEstimator,
-} from 'graphql-query-complexity';
-import cookieParser from 'cookie-parser';
-import { TContext } from './types';
-import cors from 'cors';
-import { context, getDynamicContext } from './context/typeGraphQLContext';
-import { LogService } from './services/LogService';
-import { ArgumentValidationError } from 'type-graphql';
+} from "graphql-query-complexity";
+import cookieParser from "cookie-parser";
+import { TContext } from "./types";
+import cors from "cors";
+import { context, getDynamicContext } from "./context/typeGraphQLContext";
+import { LogService } from "./services/LogService";
+import { ArgumentValidationError } from "type-graphql";
 
-dotenv.config({ debug: process.env.NODE_ENV === 'development' });
+dotenv.config({ debug: process.env.NODE_ENV === "development" });
 
 const corsOptions = {
   origin: [
     process.env.CLIENT_URL as string,
-    'https://studio.apollographql.com',
-    'https://sendgrid.com',
+    "https://studio.apollographql.com",
+    "https://sendgrid.com",
   ],
   credentials: true,
 };
 
-const MONGODB_URI = process.env.MONGODB_URI ?? 'mongodb://127.0.0.1:27017';
+const MONGODB_URI = process.env.MONGODB_URI ?? "mongodb://127.0.0.1:27017";
 
 const main = async () => {
   const logger = new LogService();
@@ -58,7 +58,7 @@ const main = async () => {
 
   app.use(cookieParser());
   app.use(cors(corsOptions));
-  app.use('/graphql/stream', async (req, res) => {
+  app.use("/graphql/stream", async (req, res) => {
     try {
       await handler(req, res);
     } catch (err) {
@@ -66,10 +66,10 @@ const main = async () => {
     }
   });
 
-  app.get('/', (_req, res) => {
+  app.get("/", (_req, res) => {
     const data = {
       uptime: process.uptime(),
-      message: 'OK',
+      message: "OK",
       date: new Date(),
     };
     res.status(200).send(data);
@@ -79,9 +79,9 @@ const main = async () => {
 
   try {
     await mongoose.connect(MONGODB_URI);
-    logger.log('***MongoDB connected***');
+    logger.log("***MongoDB connected***");
   } catch (error) {
-    console.log('Error connecting to MongoDB:', error?.message);
+    console.log("Error connecting to MongoDB:", error?.message);
   }
 
   const apolloServer = new ApolloServer({
@@ -89,12 +89,12 @@ const main = async () => {
     context,
     formatError: (error) => {
       if (error instanceof ArgumentValidationError) {
-        console.log('ValidationError: ', error.message, error.originalError);
+        console.log("ValidationError: ", error.message, error.originalError);
       }
       return error;
     },
     csrfPrevention: true,
-    introspection: process.env.NODE_ENV !== 'production',
+    introspection: process.env.NODE_ENV !== "production",
     cache: new InMemoryLRUCache({
       maxSize: Math.pow(2, 20) * 100,
       ttl: 300_000,
@@ -119,9 +119,9 @@ const main = async () => {
                 simpleEstimator({ defaultComplexity: 1 }),
               ],
             });
-            if (complexity > 35) {
+            if (complexity > 40) {
               throw new Error(
-                `Sorry, too complicated query! ${complexity} is over 35 that is the max allowed complexity.`
+                `Sorry, too complicated query! ${complexity} is over 40 that is the max allowed complexity.`
               );
             }
             if (complexity > 0)
@@ -138,7 +138,7 @@ const main = async () => {
   apolloServer.applyMiddleware({
     app,
     cors: corsOptions,
-    path: '/graphql',
+    path: "/graphql",
   });
 
   await new Promise((resolve) => httpServer.listen({ port }, resolve as any));

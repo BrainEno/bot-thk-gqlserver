@@ -1,4 +1,7 @@
-const convertToStr = (str: string) => str.replace(/<[^>]*>/g, '');
+const convertToStr = (str: string) =>
+  str.replace(/<[^>]*>/g, " ").replace(/(&nbsp;)+/g, " ");
+
+export const isHanReg = (str: string) => /\p{Han}+/.test(str) === true;
 
 export const smartTrim = (
   str: string,
@@ -8,10 +11,13 @@ export const smartTrim = (
 ): string => {
   str = convertToStr(str).trim();
 
-  if (str.length <= length) return str;
-  
+  const isHan = isHanReg(str);
 
-  let trimmedStr = str.substring(0, length + delim.length);
+  if (str.length <= length) return str;
+
+  let trimmedStr = isHan
+    ? str.substring(0, length + delim.length)
+    : str.substring(0, length * 2 + delim.length);
 
   const lastDelimIndex = trimmedStr.lastIndexOf(delim);
   if (lastDelimIndex >= 0) {

@@ -1,4 +1,4 @@
-import { AuthenticationError } from 'apollo-server-express';
+import { AuthenticationError } from "apollo-server-express";
 import {
   Arg,
   Ctx,
@@ -9,25 +9,30 @@ import {
   PubSub,
   Subscription,
   Root,
-} from 'type-graphql';
-import { TContext } from '../types';
+} from "type-graphql";
+import { TContext } from "../types";
 import {
   ConversationModel,
   MessageModel,
   ParticipantModel,
   UserModel,
-} from '../models';
-import { GraphQLError } from 'graphql';
-import { Topic } from '../topic';
+} from "../models";
+import { GraphQLError } from "graphql";
+import { Topic } from "../topic";
 import {
   ConversationCreatedPayload,
   ConversationUpdatedPayload,
   ConversationDeletedPayload,
-} from '../interfaces/conversation.interface';
-import { Conversation } from '../entities/conversation';
-import dotenv from 'dotenv';
-import mongoose, { Types } from 'mongoose';
-import { ConversationUpdated } from '../dtos/conversations';
+  ConversationPopulated,
+} from "../interfaces/conversation.interface";
+import { Conversation } from "../entities/conversation";
+import dotenv from "dotenv";
+import mongoose, { Types } from "mongoose";
+import {
+  ConversationUpdated,
+  PopulatedConversation,
+  PopulatedUser,
+} from "../dtos/conversations";
 
 dotenv.config();
 
@@ -36,81 +41,83 @@ export default class ConversationResolvers {
   @Query(() => [Conversation])
   async conversations(@Ctx() { user }: TContext) {
     if (!user) {
-      throw new AuthenticationError('Not authorized');
+      throw new AuthenticationError("Not authorized");
     }
+
+    console.log(user);
 
     try {
       const conversations = await ConversationModel.find({
         participantUserIds: user._id.toString(),
       })
         .populate({
-          path: 'participants',
-          model: 'Participant',
+          path: "participants",
+          model: "Participant",
           populate: [
-            '_id userId',
+            "_id userId hasSeenLatestMessage",
             {
-              path: 'user',
-              model: 'User',
-              populate: ['name _id photo hasSeenLatestMessage '],
+              path: "user",
+              model: "User",
+              populate: ["name _id photo"],
             },
           ],
         })
         .populate({
-          path: 'latestMessage',
-          model: 'Message',
+          path: "latestMessage",
+          model: "Message",
           populate: [
-            'body',
+            "body _id senderId createdAt updatedAt",
             {
-              path: 'sender',
-              model: 'User',
-              populate: ['name _id photo'],
+              path: "sender",
+              model: "User",
+              populate: ["username name _id photo"],
             },
           ],
         })
         .populate({
-          path: 'messages',
-          model: 'Message',
+          path: "messages",
+          model: "Message",
           populate: [
-            'body createdAt',
+            "body createdAt _id senderId updatedAt",
             {
-              path: 'sender',
-              model: 'User',
-              populate: ['_id name username photo'],
+              path: "sender",
+              model: "User",
+              populate: ["_id name username photo"],
             },
           ],
         })
-        .select('participants messages latestMessage createdAt')
+        .select("participants messages latestMessage createdAt updatedAt")
         .exec();
 
-      console.log('result res', conversations);
+      // console.log('result res', conversations);
 
       return conversations;
     } catch (error) {
-      console.log('error', error);
+      console.log("error", error);
       throw new GraphQLError(error?.message);
     }
   }
 
   @Mutation(() => String)
   async createConversation(
-    @Arg('participantUserIds', () => [String])
+    @Arg("participantUserIds", () => [String])
     participantUserIds: Array<string>,
     @Ctx() { user }: TContext,
     @PubSub(Topic.ConversationCreated)
     notifyAboutNewConversation: Publisher<ConversationCreatedPayload>
   ): Promise<string> {
     if (!user) {
-      throw new AuthenticationError('Not authorized');
+      throw new AuthenticationError("Not authorized");
     }
 
     try {
       const participants = await Promise.all(
         participantUserIds.map(async (id) => {
-          const user = await UserModel.findOne({ _id: id })
-            .select('_id')
-            .exec();
+          const user = (await UserModel.findOne({ _id: id })
+            .select("_id username name photo")
+            .exec()) as unknown as PopulatedUser;
 
-          if (!user) throw new GraphQLError('Error creating participant');
+          if (!user) throw new GraphQLError("Error creating participant");
 
           return await ParticipantModel.create({
             user,
@@ -120,16 +127,55 @@ export default class ConversationResolvers {
         })
       );
 
-      if (!participants) throw new Error('Users not find');
+      if (!participants) throw new Error("Users not find");
 
-      const conversation = await ConversationModel.create({
+      let conversation = await new ConversationModel({
         participants: participants.map((p) => p._id),
         participantUserIds: participants.map((p) => p.userId),
+      }).save();
+
+      await conversation.populate({
+        path: "participants",
+        model: "Participant",
+        populate: [
+          "_id userId hasSeenLatestMessage",
+          {
+            path: "user",
+            model: "User",
+            populate: ["name _id photo"],
+          },
+        ],
       });
 
-      await conversation.populate('participantUserIds');
+      await conversation.populate({
+        path: "latestMessage",
+        model: "Message",
+        populate: [
+          "body",
+          {
+            path: "sender",
+            model: "User",
+            populate: ["username name _id photo"],
+          },
+        ],
+      });
 
-      console.log(conversation);
+      await conversation.populate({
+        path: "messages",
+        model: "Message",
+        populate: [
+          "body createdAt",
+          {
+            path: "sender",
+            model: "User",
+            populate: ["_id name username photo"],
+          },
+        ],
+      });
+
+      conversation = conversation.toObject();
+
+      // console.log(conversation);
 
       await Promise.all(
         participants.map(async (p) => {
@@ -140,19 +186,23 @@ export default class ConversationResolvers {
         })
       );
 
-      notifyAboutNewConversation({ conversationCreated: conversation });
+      const payload = { ...conversation, participants };
+      console.log("conversation created payload: ", payload);
+      notifyAboutNewConversation({
+        conversationCreated: payload as unknown as ConversationPopulated,
+      });
 
       return conversation._id.toString();
     } catch (error) {
-      console.log('createConversation error', error);
-      throw new GraphQLError('Error creating conversation');
+      console.log("createConversation error", error);
+      throw new GraphQLError("Error creating conversation");
     }
   }
 
   @Mutation(() => Boolean)
   async markConversationAsRead(
-    @Arg('userId') userId: string,
-    @Arg('conversationId') conversationId: string
+    @Arg("userId") userId: string,
+    @Arg("conversationId") conversationId: string
   ): Promise<boolean> {
     try {
       await ParticipantModel.updateMany(
@@ -166,26 +216,66 @@ export default class ConversationResolvers {
       );
       return true;
     } catch (error) {
-      console.log('markConversationAsRead error', error);
+      console.log("markConversationAsRead error", error);
       throw new GraphQLError(error.message);
     }
   }
 
   @Mutation(() => Boolean)
   async deleteConversation(
-    @Arg('conversationId') conversationId: string,
+    @Arg("conversationId") conversationId: string,
     @Ctx() { user }: TContext,
     @PubSub(Topic.ConversationDeleted)
     notifyConversationDeleted: Publisher<ConversationDeletedPayload>
   ) {
     if (!user) {
-      throw new AuthenticationError('Not authorized');
+      throw new AuthenticationError("Not authorized");
     }
 
     try {
-      const toDelete = await ConversationModel.findOneAndRemove({
+      const toDelete = await ConversationModel.findOne({
         _id: conversationId,
-      });
+      })
+        .populate({
+          path: "participants",
+          model: "Participant",
+          populate: [
+            "_id userId hasSeenLatestMessage",
+            {
+              path: "user",
+              model: "User",
+              populate: ["name _id photo"],
+            },
+          ],
+        })
+        .populate({
+          path: "latestMessage",
+          model: "Message",
+          populate: [
+            "body",
+            {
+              path: "sender",
+              model: "User",
+              populate: ["username name _id photo"],
+            },
+          ],
+        })
+        .populate({
+          path: "messages",
+          model: "Message",
+          populate: [
+            "body createdAt",
+            {
+              path: "sender",
+              model: "User",
+              populate: ["_id name username photo"],
+            },
+          ],
+        })
+        .select(
+          "_id participants participantUserIds messages latestMessage createdAt updatedAt"
+        )
+        .exec();
 
       if (!toDelete) return false;
 
@@ -197,16 +287,20 @@ export default class ConversationResolvers {
         conversationId,
       });
 
-      console.log('deleted message count:', mc);
-      console.log('deleted participant count:', pc);
+      console.log("deleted message count:", mc);
+      console.log("deleted participant count:", pc);
 
       const deletedConversation = await toDelete.deleteOne();
-      console.log('conversation deleted payload', deletedConversation);
+      console.log("conversation deleted payload", deletedConversation);
 
-      notifyConversationDeleted({ conversationDeleted: deletedConversation });
+      const conversationDeleted = toDelete as unknown as PopulatedConversation;
+
+      notifyConversationDeleted({
+        conversationDeleted,
+      });
       return true;
     } catch (error) {
-      console.log('deleteConversation error', error);
+      console.log("deleteConversation error", error);
       throw new GraphQLError(error?.message);
     }
   }
@@ -214,13 +308,13 @@ export default class ConversationResolvers {
   @Mutation(() => Boolean)
   async updateParticipants(
     @Ctx() { user }: TContext,
-    @Arg('conversationId') conversationId: string,
-    @Arg('participantIds', () => [String]) participantIds: Array<string>,
+    @Arg("conversationId") conversationId: string,
+    @Arg("participantIds", () => [String]) participantIds: Array<string>,
     @PubSub(Topic.ConversationUpdated)
     notifyConversationUpdated: Publisher<ConversationUpdatedPayload>
   ) {
     if (!user) {
-      throw new AuthenticationError('Not authorized');
+      throw new AuthenticationError("Not authorized");
     }
 
     try {
@@ -228,7 +322,7 @@ export default class ConversationResolvers {
 
       const existingParticipants = participants.map((p) => p.userId.toString());
 
-      console.log('existing ids:', existingParticipants);
+      console.log("existing ids:", existingParticipants);
 
       const participantsToDelete = existingParticipants.filter(
         (id) => !participantIds.includes(id)
@@ -242,12 +336,14 @@ export default class ConversationResolvers {
 
       // console.log('to create participant:', participantsToCreate);
 
-      const toUpdate = await ConversationModel.findOne({ _id: conversationId });
+      const toUpdate = (await ConversationModel.findOne({
+        _id: conversationId,
+      })) as ConversationPopulated;
 
-      if (!toUpdate) throw new GraphQLError('Conversation to update not found');
+      if (!toUpdate) throw new GraphQLError("Conversation to update not found");
 
-      let addUpdate: Conversation = toUpdate;
-      let removeUpdate: Conversation = toUpdate;
+      let addUpdate: ConversationPopulated = toUpdate;
+      let removeUpdate: ConversationPopulated = toUpdate;
 
       const db = await mongoose
         .createConnection(process.env.MONGODB_URI!)
@@ -264,7 +360,7 @@ export default class ConversationResolvers {
 
         const participants = await ParticipantModel.find({
           userId: { $in: participantIds },
-          conversationId
+          conversationId,
         });
 
         const conversation = await ConversationModel.findOneAndUpdate(
@@ -275,18 +371,54 @@ export default class ConversationResolvers {
           },
           { new: true }
         )
-          .populate('participantUserIds')
-          .populate('latestMessage', 'sender')
-          .select('_id participantUserIds messages latestMessage createdAt')
+          .populate({
+            path: "participants",
+            model: "Participant",
+            populate: [
+              "_id userId hasSeenLatestMessage",
+              {
+                path: "user",
+                model: "User",
+                populate: ["name _id photo"],
+              },
+            ],
+          })
+          .populate({
+            path: "latestMessage",
+            model: "Message",
+            populate: [
+              "body",
+              {
+                path: "sender",
+                model: "User",
+                populate: ["username name _id photo"],
+              },
+            ],
+          })
+          .populate({
+            path: "messages",
+            model: "Message",
+            populate: [
+              "body createdAt",
+              {
+                path: "sender",
+                model: "User",
+                populate: ["_id name username photo"],
+              },
+            ],
+          })
+          .select(
+            "_id participantUserIds participants messages latestMessage createdAt updatedAt"
+          )
           .exec();
 
-        removeUpdate = conversation as Conversation;
+        removeUpdate = conversation as unknown as ConversationPopulated;
       }
 
       if (participantsToCreate.length) {
         await Promise.all(
           participantsToCreate.map(async (id) => {
-            console.log('conversationId: ', conversationId);
+            console.log("conversationId: ", conversationId);
 
             const participant = await ParticipantModel.create({
               user: new Types.ObjectId(id),
@@ -296,7 +428,7 @@ export default class ConversationResolvers {
               conversation: new Types.ObjectId(conversationId),
             });
 
-            console.log('new participant: ', participant);
+            console.log("new participant: ", participant);
 
             return participant;
           })
@@ -314,9 +446,46 @@ export default class ConversationResolvers {
         const conversation = await ConversationModel.findOne({
           _id: conversationId,
         })
-          .populate('participantUserIds')
-          .populate('latestMessage', 'sender')
-          .select('_id participantUserIds messages latestMessage createdAt')
+
+          .populate({
+            path: "participants",
+            model: "Participant",
+            populate: [
+              "_id userId hasSeenLatestMessage",
+              {
+                path: "user",
+                model: "User",
+                populate: ["name _id photo"],
+              },
+            ],
+          })
+          .populate({
+            path: "latestMessage",
+            model: "Message",
+            populate: [
+              "body",
+              {
+                path: "sender",
+                model: "User",
+                populate: ["username name _id photo"],
+              },
+            ],
+          })
+          .populate({
+            path: "messages",
+            model: "Message",
+            populate: [
+              "body createdAt",
+              {
+                path: "sender",
+                model: "User",
+                populate: ["_id name username photo"],
+              },
+            ],
+          })
+          .select(
+            "_id participantUserIds participants messages latestMessage createdAt updatedAt"
+          )
           .exec();
 
         if (!conversation) return;
@@ -334,7 +503,7 @@ export default class ConversationResolvers {
           })
         );
 
-        addUpdate = conversation as Conversation;
+        addUpdate = conversation as unknown as ConversationPopulated;
       }
 
       await session.commitTransaction();
@@ -347,16 +516,16 @@ export default class ConversationResolvers {
           removedUserIds: participantsToDelete,
         },
       };
-      console.log('conversation update payload', payload);
+      console.log("conversation update payload", payload);
       notifyConversationUpdated(payload);
       return true;
     } catch (error) {
-      console.log('updateParticipants error', error);
+      console.log("updateParticipants error", error);
       throw new GraphQLError(error?.message);
     }
   }
 
-  @Subscription(() => Conversation, {
+  @Subscription(() => PopulatedConversation, {
     topics: Topic.ConversationCreated,
     filter: ({
       payload,
@@ -365,8 +534,9 @@ export default class ConversationResolvers {
       payload: ConversationCreatedPayload;
       context: TContext;
     }) => {
+      console.log("context in conversationcreated sub", context);
       if (!context.user) {
-        throw new AuthenticationError('Not authorized');
+        throw new AuthenticationError("Not authorized");
       }
 
       const {
@@ -374,14 +544,14 @@ export default class ConversationResolvers {
       } = payload;
 
       //return if current user is conversation participant
-      return !!participantUserIds.find(
+      return !!participantUserIds?.find(
         (pId: string) => pId === context?.user?._id.toString()
       );
     },
   })
   conversationCreated(
     @Root() payload: ConversationCreatedPayload
-  ): ConversationCreatedPayload['conversationCreated'] {
+  ): ConversationCreatedPayload["conversationCreated"] {
     return payload.conversationCreated;
   }
 
@@ -395,10 +565,14 @@ export default class ConversationResolvers {
       context: TContext;
     }) => {
       if (!context?.user) {
-        throw new AuthenticationError('Not authorized');
+        throw new AuthenticationError("Not authorized");
       }
 
-      console.log('updating payload in filter:', payload.conversationUpdated);
+      console.log("updating payload in filter:", payload.conversationUpdated);
+      console.log(
+        "updating payload participants[0]:",
+        payload.conversationUpdated.conversation.participants[0]
+      );
 
       const {
         conversationUpdated: {
@@ -435,11 +609,11 @@ export default class ConversationResolvers {
   })
   conversationUpdated(
     @Root() payload: ConversationUpdatedPayload
-  ): ConversationUpdatedPayload['conversationUpdated'] {
+  ): ConversationUpdatedPayload["conversationUpdated"] {
     return payload.conversationUpdated;
   }
 
-  @Subscription(() => Conversation, {
+  @Subscription(() => PopulatedConversation, {
     topics: Topic.ConversationDeleted,
     filter: ({
       payload,
@@ -449,23 +623,23 @@ export default class ConversationResolvers {
       context: TContext;
     }) => {
       if (!context?.user) {
-        throw new AuthenticationError('Not authorized');
+        throw new AuthenticationError("Not authorized");
       }
 
-      console.log('deleted payload in filter:', payload.conversationDeleted);
+      console.log("deleted payload in filter:", payload.conversationDeleted);
       const {
-        conversationDeleted: { participantUserIds },
+        conversationDeleted: { participants },
       } = payload;
 
-      return !!participantUserIds.find(
-        (pId: string) => pId === context?.user?._id.toString()
+      return !!participants.find(
+        (p) => p.userId === context?.user?._id.toString()
       );
     },
   })
   conversationDeleted(
     @Root() { conversationDeleted }: ConversationDeletedPayload
-  ): ConversationDeletedPayload['conversationDeleted'] {
-    console.log('in del sub res:',conversationDeleted)
+  ): ConversationDeletedPayload["conversationDeleted"] {
+    console.log("in del sub res:", conversationDeleted);
     return conversationDeleted;
   }
 }

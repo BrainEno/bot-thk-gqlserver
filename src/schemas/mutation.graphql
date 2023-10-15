@@ -38,7 +38,6 @@ mutation RefreshToken($refreshToken: String!) {
   }
 }
 
-
 mutation EditProfile(
   $about: String
   $name: String

@@ -9,21 +9,22 @@ import {
   ResolverFilterData,
   Root,
   Subscription,
-} from 'type-graphql';
+} from "type-graphql";
 
-import { BlogInput, Blog } from '../entities/blog';
-import { UserInputError } from 'apollo-server-express';
-import { BlogModel, CategoryModel, TagModel, UserModel } from '../models';
-import { isEmpty } from 'class-validator';
-import { TContext } from '../types';
-import { smartTrim } from '../utils/smartTrim';
-import { NewBlogResponse } from '../dtos/newBlogResponse';
-import { slugify } from '../utils/slugify';
-import mongoose from 'mongoose';
-import { Topic } from '../topic';
-import { NewBlogPayload } from '../interfaces/notification.interface';
-import shortid from 'shortid';
-import { Notification } from '../dtos/notification';
+import { BlogInput, Blog } from "../entities/blog";
+import { UserInputError } from "apollo-server-express";
+import { BlogModel, CategoryModel, TagModel, UserModel } from "../models";
+import { isEmpty } from "class-validator";
+import { TContext } from "../types";
+import { smartTrim } from "../utils/smartTrim";
+import { NewBlogResponse } from "../dtos/newBlogResponse";
+import { slugify } from "../utils/slugify";
+import mongoose from "mongoose";
+import { Topic } from "../topic";
+import { NewBlogPayload } from "../interfaces/notification.interface";
+import shortid from "shortid";
+import { Notification } from "../dtos/notification";
+import { removeDuplicateObjects } from "../utils/removeDuplicateObjects";
 
 @Resolver()
 class BlogResolvers {
@@ -35,12 +36,12 @@ class BlogResolvers {
   async listBlogsWithCatTag(): Promise<Blog[]> {
     try {
       const blogs = await BlogModel.find()
-        .populate('categories', '_id name slug')
-        .populate('tags', '_id name slug')
-        .populate('author', '_id name username profile photo about')
+        .populate("categories", "_id name slug")
+        .populate("tags", "_id name slug")
+        .populate("author", "_id name username profile photo about")
         .sort({ createdAt: -1 })
         .select(
-          '_id title mtitle author body imageUri slug description categories tags createdAt updatedAt'
+          "_id title mtitle author body imageUri slug description categories tags createdAt updatedAt"
         )
         .exec();
       return blogs;
@@ -56,18 +57,18 @@ class BlogResolvers {
    * @returns
    */
   @Query(() => Blog)
-  async getBlogBySlug(@Arg('slug') slug: string): Promise<Blog> {
+  async getBlogBySlug(@Arg("slug") slug: string): Promise<Blog> {
     try {
       if (isEmpty(slug)) {
-        throw new UserInputError('slug can not be null');
+        throw new UserInputError("slug can not be null");
       }
       const blog = await BlogModel.findOne({ slug: slug })
-        .populate('categories', '_id name slug')
-        .populate('tags', '_id name slug')
-        .populate('author', '_id name username')
+        .populate("categories", "_id name slug")
+        .populate("tags", "_id name slug")
+        .populate("author", "_id name username")
         .sort({ createdAt: -1 })
         .select(
-          '_id title mtitle author body image imageUri slug description categories tags createdAt updatedAt active'
+          "_id title mtitle author body image imageUri slug description categories tags createdAt updatedAt active"
         )
         .exec();
       if (!blog) throw new Error(`not found blog with slug ${slug}`);
@@ -84,18 +85,18 @@ class BlogResolvers {
    * @returns
    */
   @Query(() => Blog)
-  async getBlogById(@Arg('blogId') blogId: string): Promise<Blog> {
+  async getBlogById(@Arg("blogId") blogId: string): Promise<Blog> {
     try {
       if (isEmpty(blogId)) {
-        throw new UserInputError('blogId can not be null');
+        throw new UserInputError("blogId can not be null");
       }
       const blog = await BlogModel.findOne({ _id: blogId })
-        .populate('categories', '_id name slug')
-        .populate('tags', '_id name slug')
-        .populate('author', '_id name username')
+        .populate("categories", "_id name slug")
+        .populate("tags", "_id name slug")
+        .populate("author", "_id name username")
         .sort({ createdAt: -1 })
         .select(
-          '_id title mtitle author body imageUri slug description categories tags createdAt updatedAt active'
+          "_id title mtitle author body imageUri slug description categories tags createdAt updatedAt active"
         )
         .exec();
       if (!blog) throw new Error(`not found blog with id ${blogId}`);
@@ -107,27 +108,29 @@ class BlogResolvers {
   }
 
   @Query(() => [Blog])
-  async searchBlogs(@Arg('query') query: string): Promise<Blog[]> {
+  async searchBlogs(@Arg("query") query: string): Promise<Blog[]> {
     try {
       const titleBlogs = await BlogModel.find({
-        title: { $regex: query, $options: 'i' },
+        title: { $regex: query, $options: "i" },
       })
-        .populate('author', 'name photo')
-        .populate('tags', 'name slug')
-        .select('slug title description createdAt tags imageUri')
+        .populate("author", "name photo")
+        .populate("tags", "name slug")
+        .select("slug title description createdAt tags imageUri")
         .exec();
 
       const decBlogs = await BlogModel.find({
-        description: { $regex: query, $options: 'i' },
+        description: { $regex: query, $options: "i" },
       })
-        .populate('author', 'name photo')
-        .populate('tags', 'name slug')
-        .select('slug title description createdAt tags imageUri')
+        .populate("author", "name photo")
+        .populate("tags", "name slug")
+        .select("slug title description createdAt tags imageUri")
         .exec();
-      const blogs = [...titleBlogs, ...decBlogs];
 
-      if (!blogs) throw new Error(`blogs not found`);
-      return blogs;
+      const blogs = [...titleBlogs, ...decBlogs];
+      const deduplicatedBlogs = removeDuplicateObjects(blogs, "slug");
+
+      if (!deduplicatedBlogs) throw new Error(`blogs not found`);
+      return deduplicatedBlogs;
     } catch (err) {
       throw err;
     }
@@ -142,14 +145,14 @@ class BlogResolvers {
    */
   @Query(() => [Blog])
   async getRelatedBlogs(
-    @Arg('slug') slug: string,
-    @Arg('catIds', () => [String]) catIds: string[],
-    @Arg('tagIds', () => [String]) tagIds: string[],
-    @Arg('limit', { nullable: true }) limit?: number
+    @Arg("slug") slug: string,
+    @Arg("catIds", () => [String]) catIds: string[],
+    @Arg("tagIds", () => [String]) tagIds: string[],
+    @Arg("limit", { nullable: true }) limit?: number
   ): Promise<Blog[]> {
     try {
       if (isEmpty(slug)) {
-        throw new UserInputError('slug can not be null');
+        throw new UserInputError("slug can not be null");
       }
       const blogs = await BlogModel.find({
         slug: { $ne: slug },
@@ -157,9 +160,9 @@ class BlogResolvers {
         categories: { $in: catIds },
       })
         .limit(limit ?? 3)
-        .populate('tags', 'name slug')
-        .populate('author', 'name')
-        .select('slug title author imageUri  createdAt updatedAt tags')
+        .populate("tags", "name slug")
+        .populate("author", "name")
+        .select("slug title author imageUri  createdAt updatedAt tags")
         .exec();
 
       if (!blogs) throw new Error(`not found blogs related with slug ${slug}`);
@@ -177,8 +180,8 @@ class BlogResolvers {
    */
   @Query(() => [Blog])
   async getUserBlogs(
-    @Arg('userId', { nullable: true }) userId?: string,
-    @Arg('username', { nullable: true }) username?: string
+    @Arg("userId", { nullable: true }) userId?: string,
+    @Arg("username", { nullable: true }) username?: string
   ): Promise<Blog[]> {
     let id = userId;
     try {
@@ -188,18 +191,19 @@ class BlogResolvers {
       } else if (!isEmpty(userId)) {
         id = userId!;
       } else {
-        throw new Error('paramter userId or username not found');
+        throw new Error("paramter userId or username not found");
       }
 
       const blogs = await BlogModel.find({
         author: id,
       })
-        .populate('tags', 'name slug')
-        .populate('categories', 'name slug')
-        .populate('author', 'name username')
+        .populate("tags", "name slug")
+        .populate("categories", "name slug")
+        .populate("author", "name username")
         .select(
-          '_id slug title tags categories author imageUri createdAt description'
+          "_id slug title tags categories author imageUri createdAt description"
         )
+        .sort({ createdAt: -1 })
         .exec();
 
       if (!blogs) throw new Error(`not found blogs belongs to user: ${userId}`);
@@ -218,29 +222,29 @@ class BlogResolvers {
   @Mutation(() => NewBlogResponse)
   async createBlog(
     @Ctx() { user }: TContext,
-    @Arg('blogInput') blogInput: BlogInput,
+    @Arg("blogInput") blogInput: BlogInput,
     @PubSub(Topic.NewNotification)
     notifyAboutNewBlog: Publisher<NewBlogPayload>,
-    @Arg('tagIds', () => [String], { nullable: true }) tagIds?: string[]
+    @Arg("tagIds", () => [String], { nullable: true }) tagIds?: string[]
   ): Promise<NewBlogResponse> {
-    if (!user) throw new Error('用户信息不可用，请重新登录');
+    if (!user) throw new Error("用户信息不可用，请重新登录");
 
     const curUser = await UserModel.findOne({ _id: user._id });
-    if (!curUser) throw new Error('未找到该用户,请重新登录');
+    if (!curUser) throw new Error("未找到该用户,请重新登录");
 
-    if (!blogInput) throw new Error('缺少必要信息，完善后重新提交');
+    if (!blogInput) throw new Error("缺少必要信息，完善后重新提交");
 
     const { body, title, imageUri, active } = blogInput;
 
-    const description = smartTrim(blogInput.body, 55, ' ', '...');
+    const description = smartTrim(blogInput.body, 55, " ", "...");
 
-    const mtitle = `${title} | ${process.env.SITE_NAME ?? 'BOT THK'}`;
+    const mtitle = `${title} | ${process.env.SITE_NAME ?? "BOT THK"}`;
     const defaultTag = await TagModel.findOne({
-      name: 'else',
+      name: "else",
     });
 
     const defaultCat = await CategoryModel.findOne({
-      name: 'Recent Post',
+      name: "Recent Post",
     });
 
     const tags =
@@ -248,7 +252,7 @@ class BlogResolvers {
     const categories = [defaultCat?._id];
     let slug = slugify(title);
     const slugExist = await BlogModel.findOne({ slug });
-    if (!!slugExist) slug += '(1)';
+    if (!!slugExist) slug += "(1)";
 
     try {
       const newBlog = new BlogModel({
@@ -272,7 +276,7 @@ class BlogResolvers {
         blogTitle: blog.title,
         authorName: curUser.name,
         authorId:
-          typeof curUser._id === 'string'
+          typeof curUser._id === "string"
             ? curUser._id
             : curUser._id.toString(),
       });
@@ -287,42 +291,42 @@ class BlogResolvers {
   @Mutation(() => NewBlogResponse)
   async updateBlog(
     @Ctx() { user }: TContext,
-    @Arg('blogId') blogId: string,
-    @Arg('blogInput') blogInput: BlogInput,
-    @Arg('tagIds', () => [String], { nullable: true }) tagIds?: string[]
+    @Arg("blogId") blogId: string,
+    @Arg("blogInput") blogInput: BlogInput,
+    @Arg("tagIds", () => [String], { nullable: true }) tagIds?: string[]
   ): Promise<NewBlogResponse> {
-    if (!user) throw new Error('当前用户信息不可用，请重新登录');
+    if (!user) throw new Error("当前用户信息不可用，请重新登录");
 
-    if (!blogInput) throw new Error('缺少必要信息，完善后重新提交');
+    if (!blogInput) throw new Error("缺少必要信息，完善后重新提交");
 
     const prevBlog = await BlogModel.findOne({
       _id: blogId,
     });
 
-    if (!prevBlog) throw new Error('加载草稿错误');
+    if (!prevBlog) throw new Error("加载草稿错误");
 
     const { body, title, imageUri, active } = blogInput;
 
     const description = smartTrim(
       blogInput.body ? blogInput.body : prevBlog.body,
       55,
-      ' ',
-      '...'
+      " ",
+      "..."
     );
 
     const mtitle = `${title || prevBlog.title} | ${
-      process.env.SITE_NAME ?? 'BOT THK'
+      process.env.SITE_NAME ?? "BOT THK"
     }`;
 
     const defaultTag = await TagModel.findOne({
-      name: 'else',
+      name: "else",
     });
 
     const tags =
       tagIds && tagIds?.length ? strToRef(tagIds) : [defaultTag!._id!];
     let slug = slugify(title || prevBlog.title);
     const slugExist = await BlogModel.findOne({ slug });
-    if (slugExist && slugExist._id.toString() !== blogId) slug += '(1)';
+    if (slugExist && slugExist._id.toString() !== blogId) slug += "(1)";
 
     prevBlog;
     try {
@@ -345,9 +349,9 @@ class BlogResolvers {
   @Mutation(() => Boolean)
   async deleteBlogById(
     @Ctx() { user }: TContext,
-    @Arg('blogId') blogId: string
+    @Arg("blogId") blogId: string
   ) {
-    if (!user) throw new Error('当前用户信息不可用，请重新登录');
+    if (!user) throw new Error("当前用户信息不可用，请重新登录");
     const res = await BlogModel.findOneAndDelete({ _id: blogId });
     return res !== null;
   }
@@ -363,9 +367,9 @@ class BlogResolvers {
   })
   blogPublished(
     @Root() payload: NewBlogPayload,
-    @Arg('followingIds', () => [String]) followingIds: string[]
+    @Arg("followingIds", () => [String]) followingIds: string[]
   ): Notification {
-    console.log('arg followingIds', followingIds);
+    console.log("arg followingIds", followingIds);
 
     const message = `${payload.authorName}__${payload.blogTitle}`;
     const linkString = `${payload.authorUsername}__${payload.blogSlug}`;

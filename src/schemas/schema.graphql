@@ -176,9 +176,9 @@ input BlogInput {
 type Subscription {
   blogPublished(followingIds: [String!]!): Notification!
   userFollowed(name: String!): Notification!
-  conversationCreated: Conversation!
+  conversationCreated: PopulatedConversation!
   conversationUpdated: ConversationUpdated!
-  conversationDeleted: Conversation!
+  conversationDeleted: PopulatedConversation!
   messageSent: Message!
 }
 
@@ -189,8 +189,42 @@ type Notification {
   dateString: String!
 }
 
+type PopulatedConversation {
+  _id: String!
+  participants: [PopulatedParticipant!]!
+  participantUserIds: [String!]!
+  messages: [PopulatedMessage!]!
+  createdAt: String!
+  updatedAt: String
+  latestMessageId: String
+  latestMessage: PopulatedMessage
+}
+
+type PopulatedParticipant {
+  _id: String!
+  user: PopulatedUser!
+  hasSeenLatestMessage: Boolean!
+  userId: String!
+}
+
+type PopulatedUser {
+  _id: String!
+  name: String!
+  username: String!
+  photo: String!
+}
+
+type PopulatedMessage {
+  _id: String!
+  body: String!
+  sender: PopulatedUser!
+  senderId: String!
+  createdAt: String!
+  updatedAt: String!
+}
+
 type ConversationUpdated {
-  conversation: Conversation!
+  conversation: PopulatedConversation!
   addedUserIds: [String!]
   removedUserIds: [String!]
 }

@@ -24,13 +24,28 @@ subscription ConversationCreated {
       body
       senderId
     }
+    messages {
+      _id
+      body
+      senderId
+      sender {
+        name
+        username
+        _id
+        photo
+      }
+      createdAt
+      updatedAt
+    }
     participantUserIds
     participants {
+      _id
       hasSeenLatestMessage
       userId
-      conversationId
     }
     latestMessageId
+    createdAt
+    updatedAt
   }
 }
 
@@ -38,15 +53,14 @@ subscription ConversationDeleted {
   conversationDeleted {
     participantUserIds
     participants {
-      conversation {
-        latestMessageId
-      }
-      conversationId
+      _id
       hasSeenLatestMessage
       userId
     }
     latestMessageId
     _id
+    createdAt
+    updatedAt
   }
 }
 
@@ -58,11 +72,24 @@ subscription ConversationUpdated {
       participantUserIds
       participants {
         hasSeenLatestMessage
-        conversationId
         _id
       }
       latestMessageId
+      latestMessage {
+        _id
+        body
+        senderId
+        createdAt
+        sender {
+          _id
+          name
+          photo
+          username
+        }
+      }
       _id
+      updatedAt
+      createdAt
     }
   }
 }

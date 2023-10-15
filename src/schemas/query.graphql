@@ -301,15 +301,23 @@ query GetFollowInfo($username: String) {
 query Conversations {
   conversations {
     latestMessage {
+      _id
+      senderId
+      createdAt
+      updatedAt
       sender {
         _id
         name
         username
       }
+      body
     }
     createdAt
+    updatedAt
     _id
     messages {
+      _id
+      senderId
       body
       sender {
         _id
@@ -318,10 +326,11 @@ query Conversations {
         photo
       }
       createdAt
+      updatedAt
     }
     participants {
       _id
-      user{
+      user {
         _id
         name
         username

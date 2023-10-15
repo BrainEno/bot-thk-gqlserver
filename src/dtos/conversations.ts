@@ -1,9 +1,95 @@
-import { Field, ObjectType } from 'type-graphql';
-import { Conversation } from '../entities/conversation';
+import { Field, ObjectType } from "type-graphql";
+
+@ObjectType()
+export class PopulatedUser {
+  @Field(() => String)
+  _id: string;
+
+  @Field(() => String)
+  name: string;
+
+  @Field(() => String)
+  username: string;
+
+  @Field(() => String)
+  photo: string;
+}
+
+@ObjectType()
+class PopulatedParticipant {
+  @Field(() => String)
+  _id: string;
+
+  @Field(() => PopulatedUser)
+  user: PopulatedUser;
+
+  @Field(() => Boolean)
+  hasSeenLatestMessage: boolean;
+
+  @Field(() => String)
+  userId: string;
+}
+
+@ObjectType()
+class PopulatedMessage {
+  @Field(() => String)
+  _id: string;
+
+  @Field(() => String)
+  body: string;
+
+  @Field(() => PopulatedUser)
+  sender: PopulatedUser;
+
+  @Field(() => String)
+  senderId: string;
+
+  @Field(() => String)
+  createdAt: string;
+
+  @Field(() => String)
+  updatedAt?: string;
+}
+
+@ObjectType()
+export class PopulatedConversation {
+  @Field(() => String)
+  _id: string;
+
+  @Field(() => [PopulatedParticipant])
+  participants: PopulatedParticipant[];
+
+  @Field(() => [String])
+  participantUserIds?: string[];
+
+  @Field(() => [PopulatedMessage])
+  messages: PopulatedMessage[];
+
+  @Field(() => String)
+  createdAt: string;
+
+  @Field(() => String, { nullable: true })
+  updatedAt: string;
+
+  @Field(() => String, { nullable: true })
+  latestMessageId?: string;
+
+  @Field(() => PopulatedMessage, { nullable: true })
+  latestMessage?: PopulatedMessage;
+}
+
+export interface ConversationUpdatedPayload {
+  conversationUpdated: {
+    conversation: PopulatedConversation;
+    addedUserIds?: string[];
+    removedUserIds?: string[];
+  };
+}
+
 @ObjectType()
 export class ConversationUpdated {
-  @Field(() => Conversation)
-  conversation: Conversation;
+  @Field(() => PopulatedConversation)
+  conversation: PopulatedConversation;
 
   @Field(() => [String], { nullable: true })
   addedUserIds?: string[];

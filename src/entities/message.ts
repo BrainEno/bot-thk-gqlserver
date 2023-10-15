@@ -1,11 +1,11 @@
-import { prop, Ref } from '@typegoose/typegoose';
-import { Max, Min } from 'class-validator';
-import { ObjectId } from 'bson';
-import { ObjectId as ObjectID } from 'mongoose';
-import { Field, ObjectType } from 'type-graphql';
+import { prop, Ref } from "@typegoose/typegoose";
+import { Max, Min } from "class-validator";
+import { ObjectId } from "bson";
+import { ObjectId as ObjectID } from "mongoose";
+import { Field, ObjectType } from "type-graphql";
 
-import { User } from './user';
-import { Conversation } from './conversation';
+import { User } from "./user";
+import { Conversation } from "./conversation";
 
 @ObjectType()
 export class Message {
@@ -13,12 +13,12 @@ export class Message {
   readonly _id: ObjectID;
 
   @prop({ type: () => String, trim: true, required: true, maxlength: 2000 })
-  @Field()
+  @Field(() => String)
   @Min(1)
   @Max(2000)
   body: string;
 
-  @prop({ ref: 'Conversation' })
+  @prop({ ref: "Conversation" })
   conversation: Ref<Conversation>;
 
   @prop(() => String)
@@ -27,7 +27,7 @@ export class Message {
   @prop(() => Boolean)
   isLatestIn: boolean;
 
-  @prop({ ref: 'User' })
+  @prop({ ref: "User" })
   @Field(() => User)
   sender: Ref<User>;
 
