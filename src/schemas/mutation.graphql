@@ -22,6 +22,19 @@ mutation Login($password: String!, $email: String!) {
 mutation CreateBlog($blogInput: BlogInput!, $tagIds: [String!]) {
   createBlog(blogInput: $blogInput, tagIds: $tagIds) {
     success
+    blog {
+      _id
+      title
+      body
+      slug
+      description
+      author {
+        name
+      }
+      tags {
+        _id
+      }
+    }
   }
 }
 

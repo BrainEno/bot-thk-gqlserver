@@ -164,6 +164,7 @@ type LoginResponse {
 
 type NewBlogResponse {
   success: Boolean!
+  blog: Blog
 }
 
 input BlogInput {

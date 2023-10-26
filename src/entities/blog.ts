@@ -1,13 +1,13 @@
-import { modelOptions, prop, Ref } from '@typegoose/typegoose';
-import { MinLength } from 'class-validator';
-import { Field, InputType, ObjectType } from 'type-graphql';
-import { Category } from './category';
-import { Comment } from './comment';
-import { Tag } from './tag';
-import { ObjectId } from 'bson';
-import { ObjectId as ObjectID } from 'mongoose';
-import { User } from './user';
-import { TimeStamps } from '@typegoose/typegoose/lib/defaultClasses';
+import { modelOptions, prop, Ref } from "@typegoose/typegoose";
+import { MinLength } from "class-validator";
+import { Field, InputType, ObjectType } from "type-graphql";
+import { Category } from "./category";
+import { Comment } from "./comment";
+import { Tag } from "./tag";
+import { ObjectId } from "bson";
+import { ObjectId as ObjectID } from "mongoose";
+import { User } from "./user";
+import { TimeStamps } from "@typegoose/typegoose/lib/defaultClasses";
 
 @ObjectType()
 @modelOptions({
@@ -28,14 +28,14 @@ export class Blog extends TimeStamps {
     maxlength: 50,
   })
   @Field()
-  @MinLength(1, { message: '标题不得为空' })
+  @MinLength(1, { message: "标题不得为空" })
   title: string;
 
   @prop({ type: () => String })
   @Field()
   slug: string;
 
-  @prop({ type: () => String, required: false, maxlength: 100, trim: true })
+  @prop({ type: () => String, required: false, maxlength: 300, trim: true })
   @Field({ nullable: true })
   description?: string;
 
@@ -51,7 +51,7 @@ export class Blog extends TimeStamps {
   @prop({ type: () => String, required: false })
   @Field({
     defaultValue:
-      'https://res.cloudinary.com/hapmoniym/image/upload/v1644331126/bot-thk/no-image_eaeuge.jpg',
+      "https://res.cloudinary.com/hapmoniym/image/upload/v1644331126/bot-thk/no-image_eaeuge.jpg",
     nullable: true,
   })
   imageUri?: string;
@@ -60,11 +60,11 @@ export class Blog extends TimeStamps {
   @Field({ defaultValue: false })
   active: boolean;
 
-  @prop({ autopopulate: true, ref: 'User', default: [] as Ref<User>[] })
+  @prop({ autopopulate: true, ref: "User", default: [] as Ref<User>[] })
   @Field(() => [User], { defaultValue: [] as Ref<User>[] })
   likedBy?: Ref<User>[];
 
-  @prop({ autopopulate: true, ref: 'Comment', default: [] as Ref<Comment>[] })
+  @prop({ autopopulate: true, ref: "Comment", default: [] as Ref<Comment>[] })
   @Field(() => [Comment], { defaultValue: [] })
   comments?: Ref<Comment>[];
 
@@ -90,7 +90,7 @@ export class Blog extends TimeStamps {
 @InputType()
 export class BlogInput {
   @Field()
-  @MinLength(1, { message: '标题不得为空' })
+  @MinLength(1, { message: "标题不得为空" })
   title: string;
 
   @Field({ nullable: false })
@@ -99,7 +99,7 @@ export class BlogInput {
 
   @Field({
     defaultValue:
-      'https://res.cloudinary.com/hapmoniym/image/upload/v1644331126/bot-thk/no-image_eaeuge.jpg',
+      "https://res.cloudinary.com/hapmoniym/image/upload/v1644331126/bot-thk/no-image_eaeuge.jpg",
     nullable: true,
   })
   imageUri?: string;

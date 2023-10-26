@@ -1,7 +1,7 @@
 const convertToStr = (str: string) =>
   str.replace(/<[^>]*>/g, " ").replace(/(&nbsp;)+/g, " ");
 
-export const isHanReg = (str: string) => /\p{Han}+/.test(str) === true;
+export const isHanReg = (str: string) => /[\u4e00-\u9fa5]/.test(str);
 
 export const smartTrim = (
   str: string,
@@ -12,6 +12,8 @@ export const smartTrim = (
   str = convertToStr(str).trim();
 
   const isHan = isHanReg(str);
+
+  console.log("isHan", isHan);
 
   if (str.length <= length) return str;
 
