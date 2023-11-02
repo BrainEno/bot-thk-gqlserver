@@ -4,15 +4,15 @@ import {
   prop,
   Ref,
   Severity,
-} from '@typegoose/typegoose';
-import { Exclude, Expose } from 'class-transformer';
-import { IsEmail, Length, MaxLength, MinLength } from 'class-validator';
-import crypto from 'crypto';
-import { ObjectId } from 'bson';
-import { Field, ObjectType } from 'type-graphql';
-import { Comment } from './comment';
-import { ObjectId as ObjectID } from 'mongoose';
-import { TimeStamps } from '@typegoose/typegoose/lib/defaultClasses';
+} from "@typegoose/typegoose";
+import { Exclude, Expose } from "class-transformer";
+import { IsEmail, Length, MaxLength, MinLength } from "class-validator";
+import crypto from "crypto";
+import { ObjectIdScalar as ObjectId } from "../utils/ObjectIdScalar";
+import { Field, ObjectType } from "type-graphql";
+import { Comment } from "./comment";
+import { ObjectId as ObjectID } from "mongoose";
+import { TimeStamps } from "@typegoose/typegoose/lib/defaultClasses";
 
 @ObjectType()
 @modelOptions({
@@ -32,13 +32,13 @@ export class User extends TimeStamps {
     index: true,
     lowercase: true,
   })
-  @MinLength(1, { message: '用户名不能为空' })
+  @MinLength(1, { message: "用户名不能为空" })
   @Field({ nullable: false })
   username: string;
 
   @prop({ type: () => String, trim: true, required: true, maxlength: 32 })
   @Field({ nullable: false })
-  @MinLength(1, { message: '用户名不得为空' })
+  @MinLength(1, { message: "用户名不得为空" })
   @MaxLength(32)
   name: string;
 
@@ -52,7 +52,7 @@ export class User extends TimeStamps {
   })
   @Field()
   @IsEmail()
-  @Length(1, 50, { message: '邮箱地址不能为空' })
+  @Length(1, 50, { message: "邮箱地址不能为空" })
   email: string;
 
   @prop({ type: () => String, required: true })
@@ -70,33 +70,33 @@ export class User extends TimeStamps {
   @Field({ nullable: true })
   about?: string;
 
-  @prop({ nullable: false, default: '0', trim: true })
+  @prop({ nullable: false, default: "0", trim: true })
   @Field()
   role: string;
 
   @prop({
     default:
-      'https://res.cloudinary.com/hapmoniym/image/upload/v1608712074/icons/avatar_w5us1g.png',
+      "https://res.cloudinary.com/hapmoniym/image/upload/v1608712074/icons/avatar_w5us1g.png",
   })
   @Field({
     defaultValue:
-      'https://res.cloudinary.com/hapmoniym/image/upload/v1608712074/icons/avatar_w5us1g.png',
+      "https://res.cloudinary.com/hapmoniym/image/upload/v1608712074/icons/avatar_w5us1g.png",
   })
   photo: string;
 
-  @prop({ default: '' })
-  @Field({ defaultValue: '' })
+  @prop({ default: "" })
+  @Field({ defaultValue: "" })
   resetPasswordLink: string;
 
-  @prop({ ref: 'Comment' })
+  @prop({ ref: "Comment" })
   @Field(() => [Comment])
   commented: Ref<Comment>[];
 
-  @prop({ ref: 'User' })
+  @prop({ ref: "User" })
   @Field(() => [User])
   followings: Ref<User>[];
 
-  @prop({ ref: 'User' })
+  @prop({ ref: "User" })
   @Field(() => [User])
   followers: Ref<User>[];
 
@@ -191,18 +191,18 @@ export class User extends TimeStamps {
   }
 
   public makeSalt() {
-    return Math.round(new Date().valueOf() * Math.random()) + '';
+    return Math.round(new Date().valueOf() * Math.random()) + "";
   }
 
   public encryptPassword(password: string) {
-    if (!password) return '';
+    if (!password) return "";
     try {
       return crypto
-        .createHmac('sha1', this.salt)
+        .createHmac("sha1", this.salt)
         .update(password)
-        .digest('hex');
+        .digest("hex");
     } catch (error) {
-      return '';
+      return "";
     }
   }
 }

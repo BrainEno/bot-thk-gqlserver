@@ -1,6 +1,6 @@
 import { prop, Ref } from "@typegoose/typegoose";
 import { Max, Min } from "class-validator";
-import { ObjectId } from "bson";
+import { ObjectIdScalar as ObjectId } from "../utils/ObjectIdScalar";
 import { ObjectId as ObjectID } from "mongoose";
 import { Field, ObjectType } from "type-graphql";
 

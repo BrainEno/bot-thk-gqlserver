@@ -4,7 +4,7 @@ import { Field, InputType, ObjectType } from "type-graphql";
 import { Category } from "./category";
 import { Comment } from "./comment";
 import { Tag } from "./tag";
-import { ObjectId } from "bson";
+import { ObjectIdScalar as ObjectId } from "../utils/ObjectIdScalar";
 import { ObjectId as ObjectID } from "mongoose";
 import { User } from "./user";
 import { TimeStamps } from "@typegoose/typegoose/lib/defaultClasses";

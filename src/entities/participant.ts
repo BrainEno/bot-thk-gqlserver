@@ -1,17 +1,17 @@
-import {  prop, Ref } from '@typegoose/typegoose';
-import { ObjectId } from 'bson';
-import { ObjectId as ObjectID } from 'mongoose';
-import { Field, ObjectType } from 'type-graphql';
+import { prop, Ref } from "@typegoose/typegoose";
+import { ObjectIdScalar as ObjectId } from "../utils/ObjectIdScalar";
+import { ObjectId as ObjectID } from "mongoose";
+import { Field, ObjectType } from "type-graphql";
 
-import { User } from './user';
-import { Conversation } from './conversation';
+import { User } from "./user";
+import { Conversation } from "./conversation";
 
 @ObjectType()
 export class Participant {
   @Field(() => ObjectId)
   readonly _id: ObjectID;
 
-  @prop({ ref: 'User' })
+  @prop({ ref: "User" })
   @Field(() => User)
   user: Ref<User>;
 
@@ -19,7 +19,7 @@ export class Participant {
   @Field(() => String)
   userId: string;
 
-  @prop({ ref: 'Conversation' })
+  @prop({ ref: "Conversation" })
   @Field(() => Conversation)
   conversation: Ref<Conversation>;
 
@@ -29,5 +29,5 @@ export class Participant {
 
   @prop(() => Boolean)
   @Field(() => Boolean)
-  hasSeenLatestMessage: Boolean;
+  hasSeenLatestMessage: boolean;
 }

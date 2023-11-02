@@ -1,5 +1,5 @@
 import { prop } from '@typegoose/typegoose'
-import { ObjectId }from 'bson'
+import { ObjectIdScalar as ObjectId } from '../utils/ObjectIdScalar'
 import { Field, ObjectType } from 'type-graphql'
 import { ObjectId as ObjectID } from 'mongoose'
 import { TimeStamps } from '@typegoose/typegoose/lib/defaultClasses'

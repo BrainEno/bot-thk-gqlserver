@@ -5,14 +5,14 @@ import {
   prop,
   Ref,
   Severity,
-} from '@typegoose/typegoose';
-import { ObjectId } from 'bson';
-import { ObjectId as ObjectID } from 'mongoose';
-import { Field, ObjectType } from 'type-graphql';
+} from "@typegoose/typegoose";
+import { ObjectIdScalar as ObjectId } from "../utils/ObjectIdScalar";
+import { ObjectId as ObjectID } from "mongoose";
+import { Field, ObjectType } from "type-graphql";
 
-import { Message } from './message';
-import { Participant } from './participant';
-import { ParticipantModel } from '../models';
+import { Message } from "./message";
+import { Participant } from "./participant";
+import { ParticipantModel } from "../models";
 
 @modelOptions({
   schemaOptions: {
@@ -22,8 +22,8 @@ import { ParticipantModel } from '../models';
   options: { allowMixed: Severity.ALLOW },
 })
 @ObjectType()
-@pre<Conversation>('save', function () {
-  this.latestMessageId = this.latestMessage?._id?.toString() || '';
+@pre<Conversation>("save", function () {
+  this.latestMessageId = this.latestMessage?._id?.toString() || "";
 })
 export class Conversation {
   @Field(() => ObjectId)
@@ -31,7 +31,7 @@ export class Conversation {
 
   @prop({
     autopopulate: true,
-    ref: 'Participant',
+    ref: "Participant",
     default: [] as Ref<Participant>[],
   })
   @Field(() => [Participant])
@@ -41,7 +41,7 @@ export class Conversation {
   @Field(() => [String])
   participantUserIds: string[];
 
-  @prop({ autopopulate: true, ref: 'Message', default: [] as Ref<Message>[] })
+  @prop({ autopopulate: true, ref: "Message", default: [] as Ref<Message>[] })
   @Field(() => [Message])
   messages: Ref<Message>[];
 
@@ -50,7 +50,7 @@ export class Conversation {
   latestMessage?: Ref<Message>;
 
   @prop(() => String)
-  @Field(() => String, { defaultValue: '' })
+  @Field(() => String, { defaultValue: "" })
   latestMessageId: string;
 
   @Field(() => Date, { defaultValue: Date.now() })

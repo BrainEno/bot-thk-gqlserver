@@ -1,9 +1,9 @@
-import { prop } from '@typegoose/typegoose';
-import { Field, ObjectType } from 'type-graphql';
-import { ObjectId } from 'bson';
-import { ObjectId as ObjectID } from 'mongoose';
-import { slugify } from '../utils/slugify';
-import { TimeStamps } from '@typegoose/typegoose/lib/defaultClasses';
+import { prop } from "@typegoose/typegoose";
+import { Field, ObjectType } from "type-graphql";
+import { ObjectIdScalar as ObjectId } from "../utils/ObjectIdScalar";
+import { ObjectId as ObjectID } from "mongoose";
+import { slugify } from "../utils/slugify";
+import { TimeStamps } from "@typegoose/typegoose/lib/defaultClasses";
 
 @ObjectType()
 export class Category extends TimeStamps {
