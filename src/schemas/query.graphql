@@ -1,359 +1,372 @@
 query CurrentUser {
-  currentUser {
-    _id
-    username
-    name
-    email
-    profile
-    about
-    role
-    photo
-    createdAt
-    updatedAt
-    followingIds
-    followerIds
-  }
+    currentUser {
+        _id
+        username
+        name
+        email
+        profile
+        about
+        role
+        photo
+        createdAt
+        updatedAt
+        followingIds
+        followerIds
+    }
 }
 
 query GetCatBlogs($getCatBlogsSlug: String!) {
-  getCatBlogs(slug: $getCatBlogsSlug) {
-    _id
-    createdAt
-    updatedAt
-    author {
-      username
-      name
-      profile
+    getCatBlogs(slug: $getCatBlogsSlug) {
+        _id
+        createdAt
+        updatedAt
+        author {
+            username
+            name
+            profile
+        }
+        tags {
+            name
+            slug
+        }
+        categories {
+            name
+            slug
+        }
+        imageUri
+        mtitle
+        description
+        slug
+        title
     }
-    tags {
-      name
-      slug
-    }
-    categories {
-      name
-      slug
-    }
-    imageUri
-    mtitle
-    description
-    slug
-    title
-  }
 }
 
 query GetTagBlogs($getTagBlogsSlug: String!) {
-  getTagBlogs(slug: $getTagBlogsSlug) {
-    _id
-    createdAt
-    updatedAt
-    author {
-      username
-      name
-      profile
+    getTagBlogs(slug: $getTagBlogsSlug) {
+        _id
+        createdAt
+        updatedAt
+        author {
+            username
+            name
+            profile
+        }
+        tags {
+            name
+            slug
+        }
+        categories {
+            name
+            slug
+        }
+        imageUri
+        mtitle
+        description
+        slug
+        title
     }
-    tags {
-      name
-      slug
-    }
-    categories {
-      name
-      slug
-    }
-    imageUri
-    mtitle
-    description
-    slug
-    title
-  }
 }
 
 query GetBlogBySlug($slug: String!) {
-  getBlogBySlug(slug: $slug) {
-    title
-    slug
-    description
-    body
-    mtitle
-    imageUri
-    active
-    likedBy {
-      username
-      name
-    }
-    comments {
-      content
-      by {
-        name
-        username
-      }
-      atBlog {
-        slug
+    getBlogBySlug(slug: $slug) {
         title
-      }
+        slug
+        description
+        body
+        mtitle
+        imageUri
+        active
+        likedBy {
+            _id
+            name
+        }
+        comments {
+            _id
+        }
+        _id
+        createdAt
+        updatedAt
+        author {
+            name
+            username
+        }
+        tags {
+            _id
+            slug
+            name
+        }
+        categories {
+            _id
+            slug
+            name
+        }
     }
-    _id
-    createdAt
-    updatedAt
-    author {
-      name
-      username
-    }
-    tags {
-      _id
-      slug
-      name
-    }
-    categories {
-      _id
-      slug
-      name
-    }
-  }
 }
 
 query ListBlogsWithCatTag {
-  listBlogsWithCatTag {
-    title
-    description
-    body
-    slug
-    _id
-    mtitle
-    imageUri
-    active
-    createdAt
-    updatedAt
-    author {
-      name
-      profile
+    listBlogsWithCatTag {
+        title
+        slug
+        _id
+        imageUri
+        createdAt
+        description
+        author {
+            name
+            profile
+        }
+        tags {
+            slug
+            name
+        }
     }
-    categories {
-      slug
-      name
-    }
-    tags {
-      slug
-      name
-    }
-  }
 }
 
 query GetRelatedBlogs(
-  $limit: Float
-  $tagIds: [String!]!
-  $catIds: [String!]!
-  $getRelatedBlogsSlug: String!
+    $limit: Float
+    $tagIds: [String!]!
+    $catIds: [String!]!
+    $getRelatedBlogsSlug: String!
 ) {
-  getRelatedBlogs(
-    limit: $limit
-    tagIds: $tagIds
-    catIds: $catIds
-    slug: $getRelatedBlogsSlug
-  ) {
-    imageUri
-    _id
-    slug
-    tags {
-      slug
-      name
+    getRelatedBlogs(
+        limit: $limit
+        tagIds: $tagIds
+        catIds: $catIds
+        slug: $getRelatedBlogsSlug
+    ) {
+        title
+        imageUri
+        _id
+        slug
+        tags {
+            _id
+            slug
+            name
+        }
+        createdAt
     }
-  }
 }
 
 query SearchBlogs($query: String!) {
-  searchBlogs(query: $query) {
-    slug
-    title
-    description
-    createdAt
-    imageUri
-    author {
-      name
-      photo
+    searchBlogs(query: $query) {
+        slug
+        title
+        description
+        createdAt
+        imageUri
+        author {
+            name
+            photo
+        }
+        tags {
+            name
+            slug
+        }
     }
-    tags {
-      name
-      slug
-    }
-  }
 }
 
 query GetUserBlogs($userId: String, $username: String) {
-  getUserBlogs(userId: $userId, username: $username) {
-    _id
-    author {
-      name
-      username
+    getUserBlogs(userId: $userId, username: $username) {
+        _id
+        author {
+            name
+            username
+        }
+        categories {
+            name
+            slug
+        }
+        tags {
+            slug
+            name
+        }
+        title
+        createdAt
+        description
+        imageUri
+        slug
     }
-    categories {
-      name
-      slug
+}
+
+query GetUserLikedBlogs {
+    getUserLikedBlogs {
+        _id
+        author {
+            name
+            username
+        }
+        categories {
+            name
+            slug
+        }
+        tags {
+            slug
+            name
+        }
+        title
+        createdAt
+        description
+        imageUri
+        slug
     }
-    tags {
-      slug
-      name
-    }
-    title
-    createdAt
-    description
-    imageUri
-    slug
-  }
 }
 
 query ListTags {
-  listTags {
-    name
-    slug
-    _id
-  }
+    listTags {
+        name
+        slug
+        _id
+    }
 }
 
 query ListCats {
-  listCats {
-    name
-    _id
-    slug
-  }
+    listCats {
+        name
+        _id
+        slug
+    }
 }
 
 query GetBlogById($blogId: String!) {
-  getBlogById(blogId: $blogId) {
-    _id
-    active
-    author {
-      name
+    getBlogById(blogId: $blogId) {
+        _id
+        active
+        author {
+            name
+        }
+        body
+        categories {
+            _id
+            name
+            slug
+        }
+        createdAt
+        description
+        imageUri
+        slug
+        tags {
+            name
+            slug
+            _id
+        }
+        title
+        updatedAt
+        mtitle
+        likedBy {
+            name
+        }
     }
-    body
-    categories {
-      _id
-      name
-      slug
-    }
-    createdAt
-    description
-    imageUri
-    slug
-    tags {
-      name
-      slug
-      _id
-    }
-    title
-    updatedAt
-    mtitle
-  }
 }
 
 query SearchUsers($name: String!) {
-  searchUsers(name: $name) {
-    _id
-    username
-    name
-    email
-    profile
-    about
-    photo
-    followingIds
-    followerIds
-  }
+    searchUsers(name: $name) {
+        _id
+        username
+        name
+        email
+        profile
+        about
+        photo
+        followingIds
+        followerIds
+    }
 }
 
 query GetUserInfo($username: String!) {
-  getUserInfo(username: $username) {
-    _id
-    createdAt
-    email
-    name
-    photo
-    about
-    username
-  }
+    getUserInfo(username: $username) {
+        _id
+        createdAt
+        email
+        name
+        photo
+        about
+        username
+    }
 }
 
 query GetFollowInfo($username: String) {
-  getFollowInfo(username: $username) {
-    followers {
-      _id
-      username
-      name
-      email
-      profile
-      about
-      photo
-      followingIds
-      followerIds
+    getFollowInfo(username: $username) {
+        followers {
+            _id
+            username
+            name
+            email
+            profile
+            about
+            photo
+            followingIds
+            followerIds
+        }
+        followings {
+            _id
+            username
+            name
+            email
+            profile
+            about
+            photo
+            followingIds
+            followerIds
+        }
     }
-    followings {
-      _id
-      username
-      name
-      email
-      profile
-      about
-      photo
-      followingIds
-      followerIds
-    }
-  }
 }
 
 query Conversations {
-  conversations {
-    latestMessage {
-      _id
-      senderId
-      createdAt
-      updatedAt
-      sender {
+    conversations {
+        latestMessage {
+            _id
+            senderId
+            createdAt
+            updatedAt
+            sender {
+                _id
+                name
+                username
+            }
+            body
+        }
+        createdAt
+        updatedAt
         _id
-        name
-        username
-      }
-      body
+        messages {
+            _id
+            senderId
+            body
+            sender {
+                _id
+                name
+                username
+                photo
+            }
+            createdAt
+            updatedAt
+        }
+        participants {
+            _id
+            user {
+                _id
+                name
+                username
+                photo
+            }
+            conversationId
+            userId
+            hasSeenLatestMessage
+        }
     }
-    createdAt
-    updatedAt
-    _id
-    messages {
-      _id
-      senderId
-      body
-      sender {
-        _id
-        name
-        username
-        photo
-      }
-      createdAt
-      updatedAt
-    }
-    participants {
-      _id
-      user {
-        _id
-        name
-        username
-        photo
-      }
-      conversationId
-      userId
-      hasSeenLatestMessage
-    }
-  }
 }
 
 query Messages($conversationId: String!) {
-  messages(conversationId: $conversationId) {
-    body
-    createdAt
-    sender {
-      _id
-      name
-      photo
-      username
+    messages(conversationId: $conversationId) {
+        body
+        createdAt
+        sender {
+            _id
+            name
+            photo
+            username
+        }
+        senderId
+        _id
     }
-    senderId
-    _id
-  }
 }

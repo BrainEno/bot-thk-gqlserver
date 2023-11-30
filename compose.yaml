@@ -1,0 +1,28 @@
+version: '24'
+services:
+  server:
+    build:
+      context: .
+    volumes:
+      - .:/usr/src/app
+      - /usr/src/app/node_modules 
+    depends_on:
+      - mongo
+    networks:
+      - express-mongo
+    expose:
+      - 4001
+  mongo:
+    image: mongo:latest
+    restart: always
+    volumes:
+      - ./data:/data/db
+    networks:
+      - express-mongo
+    expose:
+      - 27017
+networks:
+  express-mongo:
+    ipam:
+      driver: default
+

@@ -1,137 +1,187 @@
 mutation Register(
-  $registerPassword: String!
-  $registerEmail: String!
-  $registerName: String!
+    $registerPassword: String!
+    $registerEmail: String!
+    $registerName: String!
 ) {
-  register(
-    password: $registerPassword
-    email: $registerEmail
-    name: $registerName
-  )
+    register(
+        password: $registerPassword
+        email: $registerEmail
+        name: $registerName
+    )
 }
 
 mutation Login($password: String!, $email: String!) {
-  login(password: $password, email: $email) {
-    accessToken
-    refreshToken
-    accessTokenExpiry
-    ok
-  }
+    login(password: $password, email: $email) {
+        accessToken
+        refreshToken
+        accessTokenExpiry
+        ok
+    }
 }
 
 mutation CreateBlog($blogInput: BlogInput!, $tagIds: [String!]) {
-  createBlog(blogInput: $blogInput, tagIds: $tagIds) {
-    success
-    blog {
-      _id
-      title
-      body
-      slug
-      description
-      author {
-        name
-      }
-      tags {
-        _id
-      }
+    createBlog(blogInput: $blogInput, tagIds: $tagIds) {
+        success
+        blog {
+            _id
+            title
+            slug
+            tags {
+                _id
+            }
+        }
     }
-  }
 }
 
 mutation Logout {
-  logout
+    logout
 }
 
 mutation RefreshToken($refreshToken: String!) {
-  refreshToken(refreshToken: $refreshToken) {
-    accessToken
-    accessTokenExpiry
-    refreshToken
-    ok
-  }
+    refreshToken(refreshToken: $refreshToken) {
+        accessToken
+        accessTokenExpiry
+        refreshToken
+        ok
+    }
 }
 
 mutation EditProfile(
-  $about: String
-  $name: String
-  $photo: String
-  $email: String
+    $about: String
+    $name: String
+    $photo: String
+    $email: String
 ) {
-  editProfile(about: $about, name: $name, photo: $photo, email: $email)
+    editProfile(about: $about, name: $name, photo: $photo, email: $email)
 }
 
 mutation ResetPassword($password: String!, $username: String!) {
-  resetPassword(password: $password, username: $username)
+    resetPassword(password: $password, username: $username)
 }
 
 mutation ForgotPassword($email: String!) {
-  forgotPassword(email: $email)
+    forgotPassword(email: $email)
 }
 
 mutation DeleteTag($deleteTagId: String!) {
-  deleteTag(id: $deleteTagId)
+    deleteTag(id: $deleteTagId)
 }
 
 mutation NewTag($tagName: String!) {
-  newTag(tagName: $tagName)
+    newTag(tagName: $tagName)
 }
 
 mutation NewCat($catName: String!) {
-  newCat(catName: $catName)
+    newCat(catName: $catName)
 }
 
 mutation DeleteCat($deleteCatId: String!) {
-  deleteCat(id: $deleteCatId)
+    deleteCat(id: $deleteCatId)
 }
 
 mutation UpdateBlog(
-  $blogInput: BlogInput!
-  $blogId: String!
-  $tagIds: [String!]
+    $blogInput: BlogInput!
+    $blogId: String!
+    $tagIds: [String!]
 ) {
-  updateBlog(blogInput: $blogInput, blogId: $blogId, tagIds: $tagIds) {
-    success
-  }
+    updateBlog(blogInput: $blogInput, blogId: $blogId, tagIds: $tagIds) {
+        success
+    }
 }
 
 mutation DeleteBlogById($blogId: String!) {
-  deleteBlogById(blogId: $blogId)
+    deleteBlogById(blogId: $blogId)
 }
 
 mutation Follow($followName: String!) {
-  follow(followName: $followName)
+    follow(followName: $followName)
 }
 
 mutation UnFollow($name: String!) {
-  unFollow(name: $name)
+    unFollow(name: $name)
 }
 
 mutation CreateConversation($participantUserIds: [String!]!) {
-  createConversation(participantUserIds: $participantUserIds)
+    createConversation(participantUserIds: $participantUserIds)
 }
 
 mutation DeleteConversation($conversationId: String!) {
-  deleteConversation(conversationId: $conversationId)
+    deleteConversation(conversationId: $conversationId)
 }
 
 mutation UpdateParticipants(
-  $participantIds: [String!]!
-  $conversationId: String!
+    $participantIds: [String!]!
+    $conversationId: String!
 ) {
-  updateParticipants(
-    participantIds: $participantIds
-    conversationId: $conversationId
-  )
+    updateParticipants(
+        participantIds: $participantIds
+        conversationId: $conversationId
+    )
 }
 
 mutation SendMessage(
-  $conversationId: String!
-  $senderId: String!
-  $body: String!
+    $conversationId: String!
+    $senderId: String!
+    $body: String!
 ) {
-  sendMessage(conversationId: $conversationId, senderId: $senderId, body: $body)
+    sendMessage(
+        conversationId: $conversationId
+        senderId: $senderId
+        body: $body
+    )
 }
 
 mutation MarkConversationAsRead($conversationId: String!, $userId: String!) {
-  markConversationAsRead(conversationId: $conversationId, userId: $userId)
+    markConversationAsRead(conversationId: $conversationId, userId: $userId)
+}
+
+#Like
+mutation ToggleLike($blogId: String!) {
+    toggleLike(blogId: $blogId)
+}
+
+#Comment
+mutation NewComment($blogId: String!, $content: String!) {
+    newComment(blogId: $blogId, content: $content) {
+        _id
+        content
+        createdAt
+        by {
+            name
+        }
+        atBlog {
+            title
+        }
+        replies {
+            _id
+        }
+        replyTo {
+            _id
+        }
+        updatedAt
+    }
+}
+
+mutation ReplyComment($content: String!, $commentId: String!) {
+    replyComment(content: $content, commentId: $commentId) {
+        _id
+        atBlog {
+            title
+        }
+        by {
+            _id
+            name
+            photo
+        }
+        content
+        createdAt
+        replyTo {
+            _id
+        }
+        updatedAt
+    }
+}
+
+mutation DeleteComment($commentId: String!) {
+    deleteComment(commentId: $commentId)
 }

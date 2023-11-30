@@ -5,12 +5,13 @@
 
 type Query {
   currentUser: User
-  listBlogsWithCatTag: [Blog!]!
-  getBlogBySlug(slug: String!): Blog!
-  getBlogById(blogId: String!): Blog!
-  searchBlogs(query: String!): [Blog!]!
-  getRelatedBlogs(limit: Float, tagIds: [String!]!, catIds: [String!]!, slug: String!): [Blog!]!
-  getUserBlogs(username: String, userId: String): [Blog!]!
+  listBlogsWithCatTag: [PopulatedCardBlog!]!
+  getBlogBySlug(slug: String!): PopulatedBlog!
+  getBlogById(blogId: String!): PopulatedBlog!
+  searchBlogs(query: String!): [PopulatedCardBlog!]!
+  getRelatedBlogs(limit: Float, tagIds: [String!]!, catIds: [String!]!, slug: String!): [PopulatedCardBlog!]!
+  getUserBlogs(username: String, userId: String): [PopulatedBlog!]!
+  getUserLikedBlogs(username: String): [PopulatedBlog!]!
   listCats: [Category!]!
   getCatBlogs(slug: String!): [Blog!]!
   getUserInfo(username: String!): UserInfoResponse!
@@ -20,6 +21,7 @@ type Query {
   getTagBlogs(slug: String!): [Blog!]!
   conversations: [Conversation!]!
   messages(conversationId: String!): [Message!]!
+  blogComments(blogId: String!): [Comment!]!
 }
 
 type User {
@@ -33,6 +35,7 @@ type User {
   photo: String
   resetPasswordLink: String
   commented: [Comment!]!
+  likedBlogs: [Blog!]!
   followings: [User!]!
   followers: [User!]!
   followingIds: [String!]!
@@ -48,14 +51,18 @@ type Comment {
   _id: ObjectId!
   content: String!
   by: User!
-  atBlog: Blog!
+  atBlog: Blog
+  replyTo: Comment
+  replies: [Comment!]!
+  createdAt: DateTime!
+  updatedAt: DateTime
 }
 
 type Blog {
   _id: ObjectId!
   title: String!
   slug: String!
-  description: String
+  description: String!
   body: String!
   mtitle: String!
   imageUri: String
@@ -85,6 +92,62 @@ type Tag {
 The javascript `Date` as string. Type represents date and time as the ISO Date string.
 """
 scalar DateTime
+
+type PopulatedCardBlog {
+  _id: String!
+  title: String!
+  slug: String!
+  imageUri: String
+  author: PopulatedUser!
+  tags: [PopulatedTag!]!
+  description: String!
+  createdAt: DateTime!
+}
+
+type PopulatedUser {
+  _id: String!
+  name: String!
+  username: String
+  photo: String!
+  profile: String!
+}
+
+type PopulatedTag {
+  _id: String!
+  slug: String!
+  name: String!
+}
+
+type PopulatedBlog {
+  _id: String!
+  title: String!
+  slug: String!
+  description: String!
+  body: String!
+  mtitle: String!
+  imageUri: String
+  active: Boolean
+  likedBy: [PopulatedUser!]
+  comments: [PopulatedComment!]
+  categories: [PopulatedCategory!]
+  tags: [PopulatedTag!]
+  author: PopulatedUser!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type PopulatedComment {
+  _id: String!
+  content: String!
+  by: PopulatedUser!
+  atBlog: PopulatedBlog!
+}
+
+type PopulatedCategory {
+  _id: String!
+  slug: String!
+  name: String!
+}
 
 type UserInfoResponse {
   _id: String!
@@ -153,6 +216,10 @@ type Mutation {
   deleteConversation(conversationId: String!): Boolean!
   updateParticipants(participantIds: [String!]!, conversationId: String!): Boolean!
   sendMessage(conversationId: String!, senderId: String!, body: String!): Boolean!
+  toggleLike(blogId: String!): Boolean!
+  newComment(blogId: String!, content: String!): Comment!
+  replyComment(content: String!, commentId: String!): Comment!
+  deleteComment(commentId: String!): Boolean!
 }
 
 type LoginResponse {
@@ -164,7 +231,7 @@ type LoginResponse {
 
 type NewBlogResponse {
   success: Boolean!
-  blog: Blog
+  blog: PopulatedCardBlog
 }
 
 input BlogInput {
@@ -206,13 +273,6 @@ type PopulatedParticipant {
   user: PopulatedUser!
   hasSeenLatestMessage: Boolean!
   userId: String!
-}
-
-type PopulatedUser {
-  _id: String!
-  name: String!
-  username: String!
-  photo: String!
 }
 
 type PopulatedMessage {
