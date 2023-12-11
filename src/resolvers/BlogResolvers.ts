@@ -39,7 +39,7 @@ class BlogResolvers {
     @Query(() => [PopulatedCardBlog])
     async listBlogsWithCatTag(): Promise<PopulatedCardBlog[]> {
         try {
-            const blogs = await BlogModel.find()
+            const blogs = await BlogModel.find({ active: true })
                 .populate('categories', '_id name slug')
                 .populate('tags', '_id name slug')
                 .populate('author', '_id name username profile')
@@ -63,17 +63,18 @@ class BlogResolvers {
     @Query(() => PopulatedBlog)
     async getBlogBySlug(@Arg('slug') slug: string): Promise<PopulatedBlog> {
         try {
-            if (!slug || isEmpty(slug)) {
+            if (slug === undefined || isEmpty(slug)) {
                 throw new UserInputError('slug can not be null')
             }
-            const blog = (await BlogModel.findOne({ slug: slug })
+
+            const blog = (await BlogModel.findOne({ slug })
                 .populate('categories', '_id name slug')
                 .populate('tags', '_id name slug')
                 .populate('author', '_id name username')
                 .populate('likedBy', '_id name')
                 .sort({ createdAt: -1 })
                 .select(
-                    '_id title mtitle author body image imageUri slug description categories tags createdAt updatedAt active'
+                    '_id title mtitle author body image imageUri slug description categories tags createdAt updatedAt'
                 )
                 .exec()) as unknown as PopulatedBlog
             if (!blog) throw new Error(`not found blog with slug ${slug}`)
@@ -120,6 +121,7 @@ class BlogResolvers {
         try {
             const titleBlogs = await BlogModel.find({
                 title: { $regex: query, $options: 'i' },
+                active: true,
             })
                 .populate('author', 'name photo')
                 .populate('tags', 'name slug')
@@ -128,6 +130,7 @@ class BlogResolvers {
 
             const decBlogs = await BlogModel.find({
                 description: { $regex: query, $options: 'i' },
+                active: true,
             })
                 .populate('author', 'name photo')
                 .populate('tags', 'name slug')
@@ -162,10 +165,12 @@ class BlogResolvers {
             if (isEmpty(slug)) {
                 throw new UserInputError('slug can not be null')
             }
+
             const blogs = await BlogModel.find({
                 slug: { $ne: slug },
                 tags: { $in: tagIds },
                 categories: { $in: catIds },
+                active: true,
             })
                 .limit(limit ?? 3)
                 .populate('tags', 'name slug')
@@ -209,7 +214,7 @@ class BlogResolvers {
                 .populate('categories', 'name slug')
                 .populate('author', 'name username')
                 .select(
-                    '_id slug title tags categories author imageUri createdAt description'
+                    '_id slug title tags categories author imageUri createdAt description active'
                 )
                 .sort({ createdAt: -1 })
                 .exec()) as unknown as PopulatedBlog[]
@@ -252,7 +257,7 @@ class BlogResolvers {
                 .populate('categories', 'name slug')
                 .populate('author', 'name username')
                 .select(
-                    '_id slug title tags categories author imageUri createdAt description'
+                    '_id slug title tags categories author imageUri createdAt description active'
                 )
                 .sort({ createdAt: -1 })
                 .exec()) as unknown as PopulatedBlog[]
