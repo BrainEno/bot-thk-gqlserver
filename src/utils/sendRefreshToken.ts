@@ -1,13 +1,9 @@
 import { Response } from "express";
 import { sign } from "jsonwebtoken";
 import { User } from "../entities/user";
-import dotenv from "dotenv";
-
-dotenv.config({ debug: process.env.NODE_ENV === "development" });
 
 export const createAccessToken = (user: User) => {
   const accessTokenExpiry = Date.now() + 15 * 60 * 1000;
-  console.log("accessExpiry created:", accessTokenExpiry);
   const accessToken = sign(
     {
       _id: user._id,

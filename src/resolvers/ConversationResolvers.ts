@@ -44,7 +44,6 @@ export default class ConversationResolvers {
       throw new AuthenticationError("Not authorized");
     }
 
-    console.log(user);
 
     try {
       const conversations = await ConversationModel.find({
@@ -92,9 +91,8 @@ export default class ConversationResolvers {
       // console.log('result res', conversations);
 
       return conversations;
-    } catch (error) {
-      console.log("error", error);
-      throw new GraphQLError(error?.message);
+    } catch {
+      throw new GraphQLError("Unable to load conversations");
     }
   }
 
@@ -111,8 +109,11 @@ export default class ConversationResolvers {
     }
 
     try {
+      const memberIds = Array.from(
+        new Set([...participantUserIds, user._id.toString()])
+      )
       const participants = await Promise.all(
-        participantUserIds.map(async (id) => {
+        memberIds.map(async (id) => {
           const user = (await UserModel.findOne({ _id: id })
             .select("_id username name photo")
             .exec()) as unknown as PopulatedUser;
@@ -187,14 +188,12 @@ export default class ConversationResolvers {
       );
 
       const payload = { ...conversation, participants };
-      console.log("conversation created payload: ", payload);
       notifyAboutNewConversation({
         conversationCreated: payload as unknown as ConversationPopulated,
       });
 
       return conversation._id.toString();
-    } catch (error) {
-      console.log("createConversation error", error);
+    } catch {
       throw new GraphQLError("Error creating conversation");
     }
   }
@@ -202,23 +201,18 @@ export default class ConversationResolvers {
   @Mutation(() => Boolean)
   async markConversationAsRead(
     @Arg("userId") userId: string,
-    @Arg("conversationId") conversationId: string
+    @Arg("conversationId") conversationId: string,
+    @Ctx() { user }: TContext
   ): Promise<boolean> {
-    try {
-      await ParticipantModel.updateMany(
-        {
-          userId,
-          conversationId,
-        },
-        {
-          hasSeenLastestMessage: true,
-        }
-      );
-      return true;
-    } catch (error) {
-      console.log("markConversationAsRead error", error);
-      throw new GraphQLError(error.message);
+    if (!user || user._id.toString() !== userId) {
+      throw new AuthenticationError("Not authorized");
     }
+
+    const result = await ParticipantModel.updateOne(
+      { userId: user._id.toString(), conversationId },
+      { $set: { hasSeenLatestMessage: true } }
+    )
+    return result.matchedCount === 1
   }
 
   @Mutation(() => Boolean)
@@ -235,6 +229,7 @@ export default class ConversationResolvers {
     try {
       const toDelete = await ConversationModel.findOne({
         _id: conversationId,
+        participantUserIds: user._id.toString(),
       })
         .populate({
           path: "participants",
@@ -279,19 +274,10 @@ export default class ConversationResolvers {
 
       if (!toDelete) return false;
 
-      const { deletedCount: mc } = await MessageModel.deleteMany({
-        conversationId,
-      });
+      await MessageModel.deleteMany({ conversationId });
+      await ParticipantModel.deleteMany({ conversationId });
 
-      const { deletedCount: pc } = await ParticipantModel.deleteMany({
-        conversationId,
-      });
-
-      console.log("deleted message count:", mc);
-      console.log("deleted participant count:", pc);
-
-      const deletedConversation = await toDelete.deleteOne();
-      console.log("conversation deleted payload", deletedConversation);
+      await toDelete.deleteOne();
 
       const conversationDeleted = toDelete as unknown as PopulatedConversation;
 
@@ -299,9 +285,8 @@ export default class ConversationResolvers {
         conversationDeleted,
       });
       return true;
-    } catch (error) {
-      console.log("deleteConversation error", error);
-      throw new GraphQLError(error?.message);
+    } catch {
+      throw new GraphQLError("Unable to delete conversation");
     }
   }
 
@@ -322,7 +307,6 @@ export default class ConversationResolvers {
 
       const existingParticipants = participants.map((p) => p.userId.toString());
 
-      console.log("existing ids:", existingParticipants);
 
       const participantsToDelete = existingParticipants.filter(
         (id) => !participantIds.includes(id)
@@ -338,7 +322,8 @@ export default class ConversationResolvers {
 
       const toUpdate = (await ConversationModel.findOne({
         _id: conversationId,
-      })) as ConversationPopulated;
+        participantUserIds: user._id.toString(),
+      })) as ConversationPopulated | null;
 
       if (!toUpdate) throw new GraphQLError("Conversation to update not found");
 
@@ -355,6 +340,7 @@ export default class ConversationResolvers {
 
       if (participantsToDelete.length) {
         await ParticipantModel.deleteMany({
+          conversationId,
           userId: { $in: participantsToDelete },
         });
 
@@ -418,8 +404,6 @@ export default class ConversationResolvers {
       if (participantsToCreate.length) {
         await Promise.all(
           participantsToCreate.map(async (id) => {
-            console.log("conversationId: ", conversationId);
-
             const participant = await ParticipantModel.create({
               user: new Types.ObjectId(id),
               userId: id,
@@ -427,8 +411,6 @@ export default class ConversationResolvers {
               conversationId,
               conversation: new Types.ObjectId(conversationId),
             });
-
-            console.log("new participant: ", participant);
 
             return participant;
           })
@@ -516,12 +498,10 @@ export default class ConversationResolvers {
           removedUserIds: participantsToDelete,
         },
       };
-      console.log("conversation update payload", payload);
       notifyConversationUpdated(payload);
       return true;
-    } catch (error) {
-      console.log("updateParticipants error", error);
-      throw new GraphQLError(error?.message);
+    } catch {
+      throw new GraphQLError("Unable to update conversation participants");
     }
   }
 
@@ -534,7 +514,6 @@ export default class ConversationResolvers {
       payload: ConversationCreatedPayload;
       context: TContext;
     }) => {
-      console.log("context in conversationcreated sub", context);
       if (!context.user) {
         throw new AuthenticationError("Not authorized");
       }
@@ -567,12 +546,6 @@ export default class ConversationResolvers {
       if (!context?.user) {
         throw new AuthenticationError("Not authorized");
       }
-
-      console.log("updating payload in filter:", payload.conversationUpdated);
-      console.log(
-        "updating payload participants[0]:",
-        payload.conversationUpdated.conversation.participants[0]
-      );
 
       const {
         conversationUpdated: {
@@ -626,7 +599,6 @@ export default class ConversationResolvers {
         throw new AuthenticationError("Not authorized");
       }
 
-      console.log("deleted payload in filter:", payload.conversationDeleted);
       const {
         conversationDeleted: { participants },
       } = payload;
@@ -639,7 +611,6 @@ export default class ConversationResolvers {
   conversationDeleted(
     @Root() { conversationDeleted }: ConversationDeletedPayload
   ): ConversationDeletedPayload["conversationDeleted"] {
-    console.log("in del sub res:", conversationDeleted);
     return conversationDeleted;
   }
 }

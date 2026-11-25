@@ -15,7 +15,6 @@ import { Message } from "../entities/message";
 import { TContext } from "../types";
 import { ConversationModel, MessageModel, ParticipantModel } from "../models";
 import { GraphQLError } from "graphql";
-import { userIsConversationParticipant } from "../utils/userIsConversationParticipant";
 import {
   SendMessageArgs,
   MessageSentPayload,
@@ -40,26 +39,11 @@ export default class MessageResolvers {
 
     const conversation = await ConversationModel.findOne({
       _id: conversationId,
-    })
-      .populate("participants", "userId")
-      .exec();
+      participantUserIds: user._id.toString(),
+    }).exec();
 
     if (!conversation) {
       throw new GraphQLError("Conversation Not Found");
-    }
-
-    const participants = await ParticipantModel.find({
-      _id: { $in: conversation.participants },
-      conversationId,
-    });
-
-    const allowToView = userIsConversationParticipant(
-      participants,
-      user._id.toString()
-    );
-
-    if (!allowToView) {
-      throw new Error("Access Denied");
     }
 
     try {
@@ -77,9 +61,8 @@ export default class MessageResolvers {
         .exec();
 
       return messages;
-    } catch (error) {
-      console.log("messages error", error);
-      throw new GraphQLError(error?.message);
+    } catch {
+      throw new GraphQLError("Unable to load messages");
     }
   }
 
@@ -96,33 +79,33 @@ export default class MessageResolvers {
       throw new AuthenticationError("Not authorized");
     }
 
-    // console.log(body);
-
-    const { _id: userId } = user;
+    const userId = user._id.toString();
+    if (senderId !== userId) {
+      throw new AuthenticationError("Sender must match the authenticated user");
+    }
 
     const conversation = await ConversationModel.findOne({
       _id: conversationId,
+      participantUserIds: userId,
     });
+    if (!conversation) throw new AuthenticationError("Not authorized");
 
-    if (!conversation) throw new GraphQLError("Conversation Not Found");
+    const participant = await ParticipantModel.findOne({
+      userId,
+      conversationId,
+    });
+    if (!participant) throw new AuthenticationError("Not authorized");
 
     try {
       const newMessage = await MessageModel.create({
-        senderId,
-        sender: new mongoose.Types.ObjectId(senderId),
+        senderId: userId,
+        sender: new mongoose.Types.ObjectId(userId),
         conversation: new mongoose.Types.ObjectId(conversationId),
         conversationId,
         body,
       });
 
       await newMessage.populate("sender", "_id username name photo");
-
-      const participant = await ParticipantModel.findOne({
-        userId,
-        conversationId,
-      });
-
-      if (!participant) throw new GraphQLError("Participant does not exist");
 
       participant.hasSeenLatestMessage = true;
       await participant.save();
@@ -135,10 +118,12 @@ export default class MessageResolvers {
       if (!notMeParticipants)
         throw new GraphQLError("Participant does not exist");
 
-      notMeParticipants.forEach(async (np) => {
-        np.hasSeenLatestMessage = false;
-        await np.save();
-      });
+      await Promise.all(
+        notMeParticipants.map(async (participant) => {
+          participant.hasSeenLatestMessage = false;
+          await participant.save();
+        })
+      );
 
       const participants = [participant, ...notMeParticipants];
 
@@ -210,8 +195,7 @@ export default class MessageResolvers {
       });
 
       return true;
-    } catch (error) {
-      console.log("sendMessage error", error);
+    } catch {
       throw new GraphQLError("Error sending message");
     }
   }

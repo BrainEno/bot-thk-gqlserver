@@ -4,7 +4,7 @@
 # If you need more help, visit the Dockerfile reference guide at
 # https://docs.docker.com/engine/reference/builder/
 
-ARG NODE_VERSION=18.18.0
+ARG NODE_VERSION=22.22.3
 
 ################################################################################
 # Use node image for base image for all stages.
@@ -12,6 +12,7 @@ FROM node:${NODE_VERSION}-alpine as base
 
 # Set working directory for all build stages.
 WORKDIR /usr/src/app
+ENV PUPPETEER_SKIP_DOWNLOAD=true
 
 
 ################################################################################
@@ -49,7 +50,7 @@ RUN yarn run build
 FROM base as final
 
 # Use production node environment by default.
-ENV NODE_ENV test
+ENV NODE_ENV=production
 
 # Run the application as a non-root user.
 USER node
@@ -66,5 +67,5 @@ COPY --from=build /usr/src/app/build ./build
 # Expose the port that the application listens on.
 EXPOSE 4001
 
-# Run the application.
-CMD yarn start
+# Run the compiled application without requiring development dependencies.
+CMD ["node", "build/server.js"]

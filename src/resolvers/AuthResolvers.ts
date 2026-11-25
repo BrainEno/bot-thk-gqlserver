@@ -2,7 +2,6 @@ import { ApolloError, AuthenticationError } from 'apollo-server-errors'
 import { isEmail, isEmpty } from 'class-validator'
 import dotenv from 'dotenv'
 import jwt from 'jsonwebtoken'
-import path from 'path'
 import shortId from 'shortid'
 import {
     Arg,
@@ -25,8 +24,9 @@ import {
 import { isAdmin } from '../middlewares/authChecker'
 import { LoginResponse } from '../dtos/loginResponse'
 import { User } from '../entities/user'
+import { setPassword, verifyPassword } from '../services/passwordService'
 
-dotenv.config({ path: path.join(__dirname, '../.env.local') })
+dotenv.config()
 
 export class EmailError extends ApolloError {
     constructor(message: string) {
@@ -57,37 +57,38 @@ class AuthResolvers {
         @Arg('email') email: string,
         @Arg('password') password: string
     ): Promise<string> {
-        try {
-            const isUserExist = await UserModel.findOne({
-                name: name.toLowerCase(),
-            })
-            if (isUserExist)
-                throw new UsernameError('该昵称已被占用，换一个试试')
-
-            const isEmailExist = await UserModel.findOne({
-                email: email.toLowerCase(),
-            })
-            if (isEmailExist)
-                throw new EmailError('该邮箱已注册，请登录或找回密码')
-            const username = shortId.generate()
-            const profile = `${process.env.CLIENT_URL}/profile/${username}`
-            const user = new UserModel({
-                name,
-                email,
-                password,
-                profile,
-                username,
-                role: '0',
-                tokenVersion: 0,
-            })
-
-            const token = createRefreshToken(user)
-
-            await user.save()
-            return token
-        } catch (err: unknown) {
-            throw err
+        const normalizedName = name.trim()
+        const normalizedEmail = email.trim().toLowerCase()
+        if (normalizedName.length < 1 || normalizedName.length > 32) {
+            throw new UsernameError('用户名长度必须为 1 到 32 个字符')
         }
+        if (!isEmail(normalizedEmail)) throw new EmailError('邮箱格式无效')
+        if (password.length < 12 || password.length > 256) {
+            throw new PasswordError('密码长度必须为 12 到 256 个字符')
+        }
+
+        const isUserExist = await UserModel.findOne({ name: normalizedName })
+            .collation({ locale: 'en', strength: 2 })
+            .exec()
+        if (isUserExist) throw new UsernameError('该昵称已被占用，换一个试试')
+
+        const isEmailExist = await UserModel.findOne({ email: normalizedEmail })
+        if (isEmailExist) throw new EmailError('该邮箱已注册，请登录或找回密码')
+
+        const username = shortId.generate()
+        const profile = `${process.env.CLIENT_URL}/profile/${username}`
+        const user = new UserModel({
+            name: normalizedName,
+            email: normalizedEmail,
+            profile,
+            username,
+            role: '0',
+            tokenVersion: 0,
+        })
+        await setPassword(user, password)
+        await user.save()
+
+        return createRefreshToken(user)
     }
 
     @Mutation(() => LoginResponse)
@@ -96,66 +97,66 @@ class AuthResolvers {
         @Arg('password') password: string,
         @Ctx() context: TContext
     ): Promise<LoginResponse> {
-        try {
-            if (isEmpty(email)) throw new EmailError('邮箱不得为空')
-            if (isEmpty(password)) throw new PasswordError('密码不得为空')
-            const user = await UserModel.findOne({ email })
-            if (!user) throw new EmailError('未找到邮箱，请先注册')
+        const normalizedEmail = email.trim().toLowerCase()
+        if (isEmpty(normalizedEmail) || isEmpty(password)) {
+            throw new AuthenticationError('邮箱或密码错误')
+        }
 
-            const passwordMatches = user.authenticate(password)
-            if (!passwordMatches)
-                throw new PasswordError('邮箱和密码不匹配，请重新输入')
+        const user = await UserModel.findOne({ email: normalizedEmail })
+        const passwordMatches = user
+            ? await verifyPassword(user, password)
+            : false
+        if (!user || !passwordMatches) {
+            throw new AuthenticationError('邮箱或密码错误')
+        }
 
-            const { accessToken, accessTokenExpiry } = createAccessToken(user)
-            const refreshToken = createRefreshToken(user)
+        const { accessToken, accessTokenExpiry } = createAccessToken(user)
+        const refreshToken = createRefreshToken(user)
 
-            setRefreshToken(context.res, refreshToken)
-            setAccessToken(context.res, accessToken)
-            console.log('login accessToken:', accessToken)
-            return {
-                ok: true,
-                accessToken,
-                refreshToken,
-                accessTokenExpiry,
-            }
-        } catch (error) {
-            console.log(error)
-            throw new AuthenticationError(error)
+        setRefreshToken(context.res, refreshToken)
+        setAccessToken(context.res, accessToken)
+        return {
+            ok: true,
+            accessToken,
+            refreshToken,
+            accessTokenExpiry,
         }
     }
 
     @Mutation(() => LoginResponse)
-    async refreshToken(@Arg('refreshToken') refreshToken: string) {
-        const payload = jwt.verify(
-            refreshToken,
-            process.env.REFRESH_TOKEN_SECRET as string
-        ) as User
-
-        if (payload) {
-            const user = await UserModel.findOne({ _id: payload._id })
-            //check if token version is valid
-            if (user && user?.tokenVersion === payload.tokenVersion) {
-                const { accessToken, accessTokenExpiry } =
-                    createAccessToken(user)
-
-                const newRefreshToken = createRefreshToken(user)
-
-                console.log('refresh token accessToken:', accessToken)
-
-                return {
-                    accessToken,
-                    accessTokenExpiry,
-                    refreshToken: newRefreshToken,
-                    ok: true,
-                }
-            }
-        }
-
-        return {
+    async refreshToken(
+        @Arg('refreshToken') refreshToken: string,
+        @Ctx() { res }: TContext
+    ): Promise<LoginResponse> {
+        const invalidResponse: LoginResponse = {
             accessToken: '',
             accessTokenExpiry: -1,
             refreshToken: '',
             ok: false,
+        }
+        const secret = process.env.REFRESH_TOKEN_SECRET
+        if (!secret) return invalidResponse
+
+        try {
+            const payload = jwt.verify(refreshToken, secret) as User
+            const user = await UserModel.findOne({ _id: payload._id })
+            if (!user || user.tokenVersion !== payload.tokenVersion) {
+                return invalidResponse
+            }
+
+            const { accessToken, accessTokenExpiry } = createAccessToken(user)
+            const newRefreshToken = createRefreshToken(user)
+            setRefreshToken(res, newRefreshToken)
+            setAccessToken(res, accessToken)
+
+            return {
+                accessToken,
+                accessTokenExpiry,
+                refreshToken: newRefreshToken,
+                ok: true,
+            }
+        } catch {
+            return invalidResponse
         }
     }
 
@@ -175,9 +176,8 @@ class AuthResolvers {
                 return curUser
             }
             return null
-        } catch (error) {
-            console.log(error)
-            throw new AuthenticationError(error)
+        } catch {
+            throw new AuthenticationError('Unable to load the current user')
         }
     }
 
@@ -194,51 +194,69 @@ class AuthResolvers {
     }
 
     @Mutation(() => String)
-    async forgotPassword(@Arg('email') email: string) {
-        const user = await UserModel.findOne({ email })
-        if (!user) throw new Error('User not found')
+    async forgotPassword(@Arg('email') email: string): Promise<string> {
+        const response =
+            '如果该邮箱已注册，重置指引将在几分钟内发送。请查看您的邮箱。'
+        const normalizedEmail = email.trim().toLowerCase()
+        if (!isEmail(normalizedEmail)) return response
 
-        const token = jwt.sign(
-            { _id: user._id },
-            process.env.JWT_RESET_PASSWORD!,
-            {
-                expiresIn: '10m',
-            }
-        )
         try {
-            const emailData = genEmailData(email, token)
-            await sgMail.send(emailData)
-            return `邮件已发送给${email}。请跟随指引重置您的密码，链接10分钟内有效。`
-        } catch (error) {
-            if (user && isEmail(email)) {
-                return `${process.env.CLIENT_URL}/auth/password/reset/${token}`
-            }
-            return error
+            const user = await UserModel.findOne({ email: normalizedEmail })
+            if (!user || !process.env.JWT_RESET_PASSWORD) return response
+
+            const token = jwt.sign(
+                { _id: user._id.toString(), tokenVersion: user.tokenVersion },
+                process.env.JWT_RESET_PASSWORD,
+                { expiresIn: '10m' }
+            )
+            const apiKey = process.env.SENDGRID_API_KEY
+            if (!apiKey) return response
+
+            sgMail.setApiKey(apiKey)
+            await sgMail.send(genEmailData(normalizedEmail, token))
+        } catch {
+            // Do not reveal whether the account exists or expose reset credentials.
         }
+
+        return response
     }
 
     @Mutation(() => Boolean)
     async resetPassword(
-        @Ctx() { user }: TContext,
-        @Arg('username') username: string,
+        @Ctx() { res }: TContext,
+        @Arg('token') token: string,
         @Arg('password') password: string
-    ) {
+    ): Promise<boolean> {
+        if (password.length < 12 || password.length > 256) return false
+        const secret = process.env.JWT_RESET_PASSWORD
+        if (!secret) return false
+
         try {
-            const authedUser = await UserModel.findOne({
-                _id: user?._id,
-                username: username,
-            }).exec()
-            if (!!authedUser) {
-                if (!isEmpty(password)) {
-                    await authedUser.updatePassword(password)
-
-                    return true
-                }
+            const payload = jwt.verify(token, secret) as {
+                _id?: string
+                tokenVersion?: number
             }
-            return false
-        } catch (error) {
-            console.error(error)
+            if (!payload._id || typeof payload.tokenVersion !== 'number') {
+                return false
+            }
 
+            const account = await UserModel.findOne({
+                _id: payload._id,
+                tokenVersion: payload.tokenVersion,
+            }).exec()
+            if (!account) return false
+
+            await setPassword(account, password)
+            account.tokenVersion += 1
+            await account.save()
+            res.clearCookie('botthk', { httpOnly: true, sameSite: 'none', secure: true })
+            res.clearCookie('botthk_refresh', {
+                httpOnly: true,
+                sameSite: 'none',
+                secure: true,
+            })
+            return true
+        } catch {
             return false
         }
     }

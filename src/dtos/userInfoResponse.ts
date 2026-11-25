@@ -12,9 +12,6 @@ export class UserInfoResponse {
   name: string;
 
   @Field()
-  email: string;
-
-  @Field()
   about: string;
 
   @Field()
