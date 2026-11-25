@@ -37,7 +37,6 @@ class UserResolvers {
         _id:user._id.toString(),
         username: user.username,
         name: user.name,
-        email: user.email,
         about: user.about || '',
         photo: user.photo,
         createdAt: user.createdAt,
@@ -48,22 +47,24 @@ class UserResolvers {
     }
   }
 
-  @Query(() => [User], { nullable: true })
-  async searchUsers(@Arg('name') name: string) {
-    try {
-      const users = await UserModel.find({
-        name: { $regex: name, $options: 'i' },
-      })
-        .select(
-          '_id username name email profile about photo followingIds followerIds'
-        )
-        .exec();
+  @Query(() => [UserInfoResponse])
+  async searchUsers(@Arg('name') name: string): Promise<UserInfoResponse[]> {
+    const searchTerm = name.trim().slice(0, 64)
+    if (!searchTerm) return []
 
-      if (!users) return [];
-      return users;
-    } catch (err) {
-      throw err;
-    }
+    const escapedTerm = [...searchTerm]
+      .map((character) =>
+        '.*+?^${}()|[]\\'.includes(character) ? `\\${character}` : character
+      )
+      .join('')
+    const users = await UserModel.find({
+      name: { $regex: escapedTerm, $options: 'i' },
+    })
+      .select('_id username name about photo createdAt')
+      .limit(20)
+      .exec()
+
+    return users.map(toUserInfoResponse)
   }
 
   @Query(() => FollowInfo, { nullable: true })
@@ -71,37 +72,29 @@ class UserResolvers {
     @Ctx() { user }: TContext,
     @Arg('username', { nullable: true }) username?: string
   ) {
-    let toSearch: any;
-    if (username) toSearch = await UserModel.findOne({ username });
-    if (!username && user)
-      toSearch = await UserModel.findOne({ _id: user._id });
+    let toSearch: User | null = null
+    if (username) toSearch = await UserModel.findOne({ username })
+    if (!username && user) {
+      toSearch = await UserModel.findOne({ _id: user._id })
+    }
 
-    try {
-      if (toSearch) {
-        const followings = await UserModel.find({
-          _id: {
-            $in: toSearch.followings,
-          },
-        })
-          .select(
-            '_id username name email profile about photo followingIds followerIds'
-          )
-          .exec();
+    if (toSearch) {
+      const followings = await UserModel.find({
+        _id: { $in: toSearch.followings },
+      })
+        .select('_id username name about photo createdAt')
+        .exec()
 
-        const followers = await UserModel.find({
-          _id: {
-            $in: toSearch.followers,
-          },
-        })
-          .select(
-            '_id username name email profile about photo followingIds followerIds'
-          )
-          .exec();
+      const followers = await UserModel.find({
+        _id: { $in: toSearch.followers },
+      })
+        .select('_id username name about photo createdAt')
+        .exec()
 
-        return { followers, followings };
+      return {
+        followers: followers.map(toUserInfoResponse),
+        followings: followings.map(toUserInfoResponse),
       }
-    } catch (err) {
-      throw err;
     }
     return {
       followers: [],
@@ -283,5 +276,14 @@ class UserResolvers {
     };
   }
 }
+
+const toUserInfoResponse = (user: User): UserInfoResponse => ({
+  _id: user._id.toString(),
+  username: user.username,
+  name: user.name,
+  about: user.about || '',
+  photo: user.photo,
+  createdAt: user.createdAt,
+})
 
 export default UserResolvers;

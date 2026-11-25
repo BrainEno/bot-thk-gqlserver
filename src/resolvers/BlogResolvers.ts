@@ -12,7 +12,7 @@ import {
 } from 'type-graphql'
 
 import { BlogInput } from '../entities/blog'
-import { UserInputError } from 'apollo-server-express'
+import { AuthenticationError, UserInputError } from 'apollo-server-express'
 import { BlogModel, CategoryModel, TagModel, UserModel } from '../models'
 import { isEmpty } from 'class-validator'
 import { TContext } from '../types'
@@ -355,11 +355,13 @@ class BlogResolvers {
 
         if (!blogInput) throw new Error('缺少必要信息，完善后重新提交')
 
-        const prevBlog = await BlogModel.findOne({
-            _id: blogId,
-        })
+        const prevBlog = await BlogModel.findOne(
+            user.role === '1'
+                ? { _id: blogId }
+                : { _id: blogId, author: user._id }
+        )
 
-        if (!prevBlog) throw new Error('加载草稿错误')
+        if (!prevBlog) throw new AuthenticationError('Not authorized')
 
         const { body, title, imageUri, active } = blogInput
 
@@ -410,8 +412,12 @@ class BlogResolvers {
         @Arg('blogId') blogId: string
     ) {
         if (!user) throw new Error('当前用户信息不可用，请重新登录')
-        const res = await BlogModel.findOneAndDelete({ _id: blogId })
-        return res !== null
+        const deleted = await BlogModel.findOneAndDelete(
+            user.role === '1'
+                ? { _id: blogId }
+                : { _id: blogId, author: user._id }
+        )
+        return deleted !== null
     }
 
     @Subscription(() => Notification, {

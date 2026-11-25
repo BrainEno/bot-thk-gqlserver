@@ -15,7 +15,7 @@ type Query {
   listCats: [Category!]!
   getCatBlogs(slug: String!): [Blog!]!
   getUserInfo(username: String!): UserInfoResponse!
-  searchUsers(name: String!): [User!]
+  searchUsers(name: String!): [UserInfoResponse!]!
   getFollowInfo(username: String): FollowInfo
   listTags: [Tag!]!
   getTagBlogs(slug: String!): [Blog!]!
@@ -153,15 +153,14 @@ type UserInfoResponse {
   _id: String!
   username: String!
   name: String!
-  email: String!
   about: String!
   photo: String!
   createdAt: DateTime!
 }
 
 type FollowInfo {
-  followers: [User!]!
-  followings: [User!]!
+  followers: [UserInfoResponse!]!
+  followings: [UserInfoResponse!]!
 }
 
 type Conversation {
@@ -199,7 +198,7 @@ type Mutation {
   refreshToken(refreshToken: String!): LoginResponse!
   logout: Boolean!
   forgotPassword(email: String!): String!
-  resetPassword(password: String!, username: String!): Boolean!
+  resetPassword(password: String!, token: String!): Boolean!
   revokeRefreshTokensForUser(userId: String!): Boolean!
   createBlog(tagIds: [String!], blogInput: BlogInput!): NewBlogResponse!
   updateBlog(tagIds: [String!], blogInput: BlogInput!, blogId: String!): NewBlogResponse!

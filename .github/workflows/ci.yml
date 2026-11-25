@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify (Node ${{ matrix.node-version }})
+    runs-on: ubuntu-latest
+    env:
+      PUPPETEER_SKIP_DOWNLOAD: 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [22, 24]
+
+    services:
+      mongo:
+        image: mongo:8
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.runCommand({ ping: 1 }).ok'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: yarn
+      - name: Prepare local environment
+        run: cp .env.example .env
+      - name: Validate Compose configuration
+        run: docker compose config --quiet
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+      - name: Lint
+        run: yarn lint
+      - name: Typecheck
+        run: yarn typecheck
+      - name: Test
+        run: yarn test
+        env:
+          ACCESS_TOKEN_SECRET: test-access-token-secret-that-is-long-enough
+          REFRESH_TOKEN_SECRET: test-refresh-token-secret-that-is-long-enough
+          JWT_RESET_PASSWORD: test-reset-secret-that-is-long-enough
+          MONGODB_URI: mongodb://127.0.0.1:27017/bot-thk-test
+      - name: Build
+        run: yarn build
+        env:
+          ACCESS_TOKEN_SECRET: test-access-token-secret-that-is-long-enough
+          REFRESH_TOKEN_SECRET: test-refresh-token-secret-that-is-long-enough
+          JWT_RESET_PASSWORD: test-reset-secret-that-is-long-enough
+      - name: Build production image
+        run: docker build --target final -t bot-thk-gqlserver:ci .

@@ -5,9 +5,9 @@ import {
     Ref,
     Severity,
 } from '@typegoose/typegoose'
-import { Exclude, Expose } from 'class-transformer'
+import { Exclude } from 'class-transformer'
 import { IsEmail, Length, MaxLength, MinLength } from 'class-validator'
-import crypto from 'crypto'
+import { setPassword as hashAndSetPassword } from '../services/passwordService'
 import { ObjectIdScalar as ObjectId } from '../utils/ObjectIdScalar'
 import { Field, ObjectType } from 'type-graphql'
 import { Comment } from './comment'
@@ -122,19 +122,6 @@ export class User extends TimeStamps {
     @prop({ default: 0 })
     tokenVersion: number
 
-    @Expose()
-    _password: string
-
-    public set password(pw: string) {
-        this._password = pw
-        this.salt = this.makeSalt()
-        this.hashed_password = this.encryptPassword(pw)
-    }
-
-    public get password() {
-        return this._password
-    }
-
     public get followingsCount() {
         return this.followings.length
     }
@@ -195,29 +182,7 @@ export class User extends TimeStamps {
         this: DocumentType<User>,
         newPass: string
     ): Promise<void> {
-        this._password = newPass
-        this.salt = this.makeSalt()
-        this.hashed_password = this.encryptPassword(newPass)
+        await hashAndSetPassword(this, newPass)
         await this.save()
-    }
-
-    public authenticate(plainText: string): boolean {
-        return this.encryptPassword(plainText) === this.hashed_password
-    }
-
-    public makeSalt() {
-        return Math.round(new Date().valueOf() * Math.random()) + ''
-    }
-
-    public encryptPassword(password: string) {
-        if (!password) return ''
-        try {
-            return crypto
-                .createHmac('sha1', this.salt)
-                .update(password)
-                .digest('hex')
-        } catch (error) {
-            return ''
-        }
     }
 }
