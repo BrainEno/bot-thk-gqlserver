@@ -12,13 +12,15 @@ AgentRuntime ── ModelProvider (interface; ScriptedFakeProvider for tests)
         │
         ├── ToolRegistry ── JSON Schema validation ── AgentPolicy
         │                                            └── one-use approval verifier
-        ├── RunStore (in-memory prototype; optimistic versions)
+        ├── RunStore
+        │     ├── InMemoryRunStore (tests/local only)
+        │     └── MongoRunStore (atomic single-document CAS adapter; not integration-tested here)
         └── TraceSink (no-op by default; redacting adapter available)
 ```
 
 ## Guarantees in this prototype
 
-- A run ID is opaque and bounded. A run is associated with both a tenant and a principal; reads in the in-memory store require both scope values.
+- A run ID is opaque and bounded. A run is associated with both a tenant and a principal; the in-memory and Mongo adapter reads require both scope values. The Mongo adapter also provides an unscoped internal lookup used only for compare-and-swap conflict diagnosis; do not expose it through an API.
 - Tool names, descriptions, schemas, permissions, and effect class are declared up front. The registry is sealed when a runtime is constructed. Unknown tools and invalid arguments fail closed.
 - JSON inputs are constrained by schema, depth, node count, and supported JSON types. Approval input digests use canonical JSON so object key ordering does not change the digest.
 - `PermissionPolicy` requires declared permissions for all tools. `read_only` tools do not require approval. Every `write` tool requires a grant bound to run, tenant, principal, tool, and exact argument digest; an `ApprovalVerifier` is responsible for atomic one-use consumption.
@@ -30,7 +32,7 @@ These are code-level prototype guarantees, not a substitute for identity verific
 
 ## Local development
 
-The module is exported from `src/agentic/index.ts`. Construct a `ToolRegistry`, register only reviewed tools, create a policy/store/provider, then instantiate `AgentRuntime`. See `test/agenticRuntime.spec.ts` for complete examples. The fake provider consumes a fixed decision script and does not make network calls.
+The module is exported from `src/agentic/index.ts`. Construct a `ToolRegistry`, register only reviewed tools, create a policy/store/provider, then instantiate `AgentRuntime`. See `test/agenticRuntime.spec.ts` for complete examples. The fake provider consumes a fixed decision script and does not make network calls. For persistence adapter development, `createMongoRunCollection(connection)` registers the `AgentRun` Mongoose schema and `MongoRunStore` wraps its CAS operations; see `test/agenticMongoRunStore.spec.ts` for offline adapter-contract tests. This factory does not connect to Mongo or run index migrations.
 
 Run the repository checks:
 
@@ -45,7 +47,7 @@ Do not register a real side-effect tool for tests that use broad or production c
 
 ## Prototype limitations and required production work
 
-1. **Durable state and recovery:** `InMemoryRunStore` loses all runs on restart and is not shared across processes. Implement a Mongo-backed `RunStore` with unique IDs, scoped reads, schema/version migration, atomic compare-and-swap transitions, append-only event semantics, TTL/retention policy, and crash/recovery integration tests.
+1. **Durable state and recovery:** a first `MongoRunStore` adapter and strict Mongoose schema now exist. It uses unique run IDs, scoped reads, atomic version/status compare-and-swap updates, monotonic counters, and redacted append-only events. `InMemoryRunStore` remains test/local only. The Mongo adapter has only fake-collection and schema/index-definition unit tests so far: no live Mongo deployment, index migration, crash/restart test, TTL/retention policy, or production wiring has been verified. Add those before production use.
 2. **Approval UX and atomicity:** no approval endpoint, pending-action checkpoint/resume flow, or production verifier exists. Implement a transactional one-use grant consume operation and bind approval to a human actor, exact displayed arguments, expiry, tenant, run, tool version, and digest. Ensure retries cannot repeat an external side effect; use idempotency keys or an outbox.
 3. **Provider hardening:** no real provider adapter, prompt governance, token/cost accounting, model output moderation, retry policy, or provider data-retention review is included. Add providers behind the interface only after secret handling, timeout behavior, redaction, and vendor privacy review are approved.
 4. **Tool isolation:** the runtime is not a sandbox. Tools execute in-process with application privileges. Any tool that accesses business data must call existing authorized service methods using a trusted principal context; do not pass raw database handles to tools. Add network egress, concurrency, rate, CPU/memory, and per-tool timeout controls at the execution boundary.

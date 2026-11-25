@@ -1,6 +1,7 @@
 export * from './canonicalJson'
 export * from './evaluation'
 export * from './fakeProvider'
+export * from './mongoRunStore'
 export * from './policy'
 export * from './redaction'
 export * from './runStore'
