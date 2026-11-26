@@ -77,3 +77,39 @@ Do not enable a public entry point until all of the following are demonstrated i
 - reviewed tools calling service-layer authorization, with no generic shell, filesystem, arbitrary HTTP, or direct database access;
 - load/concurrency/resource limits, rate limiting, retention/deletion, metrics/alerts, and operational rollback;
 - offline deterministic tests plus a separately controlled evaluation suite for the selected real provider.
+
+## Runtime-backed offline evaluation
+
+`evaluationRunner.ts` accepts a provider-neutral executor. `runtimeEvaluationAdapter.ts` now connects that interface to the actual `AgentRuntime` and its scoped `RunStore.get` contract. The adapter does not construct an `AgentRuntime`, discover services, open a database, or choose a provider on its own; callers must inject an evaluation factory. Each executor invocation passes a defensive fixture copy and `{ caseId, repetition }` to that factory, runs the runtime, then retrieves the run snapshot using both the fixture tenant and principal.
+
+The adapter requires the returned run ID, tenant ID, principal ID, terminal/waiting status, step count, tool-call count, output, and all pending-approval claims to agree between the runtime result and persisted snapshot. A missing snapshot or any mismatch is an execution error (never a fabricated successful result). Error messages from the adapter are deliberately generic; underlying factory/runtime/store errors are rethrown only so `runVersionedEvaluationSuite` can turn them into a non-sensitive finding at its report boundary. Returned result and event values are detached copies. Snapshot-only fields such as encrypted checkpoints are not included in suite output.
+
+For ordinary offline regression work, use the isolated factory, which creates a new scripted provider, sealed tool registry, in-memory run store, permission policy, and redacting in-memory trace writer on every repetition:
+
+```ts
+import {
+    createAgentRuntimeEvaluationExecutor,
+    createIsolatedEvaluationFactory,
+    runVersionedEvaluationSuite,
+} from '../src/agentic'
+
+const factory = createIsolatedEvaluationFactory((_input, context) => ({
+    decisions: context.repetition === 0
+        ? [{ kind: 'final', output: 'the reviewed fixture result' }]
+        : [{ kind: 'final', output: 'the reviewed fixture result' }],
+    tools: [],
+    clock: () => 1_000,
+}))
+const execute = createAgentRuntimeEvaluationExecutor(factory)
+const report = await runVersionedEvaluationSuite(reviewedSuite, execute)
+```
+
+A case that calls a tool should register a local, deterministic stub whose schema, permissions, side-effect declaration, output, and behavior are defined in test code. The harness intentionally has no production service container, Mongo connection, provider client, network transport, or approval workflow. A write tool without an explicitly configured approval workflow fails closed before its `execute` method runs. The utility cannot inspect a tool closure and prove it has no hidden network or business side effects: do not pass production tools, credentials, database handles, or service clients to it. Treat the tool list as executable test code and review it accordingly.
+
+The `IsolatedEvaluationScenarioResolver` is called once per repetition. It may use case IDs and repetition numbers to choose deterministic scripts, but should avoid timestamps, random values, ambient environment, and shared mutable state when the suite asserts determinism. A new factory result means a new provider cursor, tool registry, run map, and trace writer. Use fixture run IDs unique within a suite; a repeated case reuses its fixture ID safely because each repetition gets its own isolated store.
+
+### Contract and integration test coverage
+
+The adapter tests verify invocation identity, scoped reads, rejection of malformed sessions, fail-closed handling of absent and inconsistent snapshots, output/counter/status checks, and exact comparison of all pending approval fields. They also check defensive copies, unusual JSON object keys, omission of encrypted snapshot internals, and propagation of errors for sanitization by the suite runner. A composed test executes a real runtime loop against `ScriptedFakeProvider`, a local read-only fake tool, and `InMemoryRunStore`, then checks repeated deterministic evaluation.
+
+The harness tests cover fresh collaborators per repetition, asynchronous scenario resolution, copied principal values, script validation, malformed/duplicate tools, pure text-only scenarios, bounded tool context, write suspension/failure behavior, trace locality, and script exhaustion. These are in-process tests: they do not establish live Mongo behavior, service/API isolation beyond the construction shown in code, or safety of arbitrary tool implementations. The opt-in live Mongo integration test remains separate and must not be described as passing unless it has actually run against a local Mongo instance.
