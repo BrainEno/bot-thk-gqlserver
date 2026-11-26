@@ -269,7 +269,15 @@ export interface GoldenCase {
     readonly expectedStatus: RunStatus
     readonly outputIncludes?: string
     readonly expectedTools?: readonly string[]
+    readonly expectedToolSequence?: readonly string[]
     readonly forbiddenTools?: readonly string[]
+    readonly requiredEventTypes?: readonly RunEventType[]
+    readonly forbiddenEventTypes?: readonly RunEventType[]
+    readonly minSteps?: number
+    readonly maxSteps?: number
+    readonly minToolCalls?: number
+    readonly maxToolCalls?: number
+    readonly expectedPendingApprovalTool?: string | null
 }
 
 export interface EvaluationFinding {
