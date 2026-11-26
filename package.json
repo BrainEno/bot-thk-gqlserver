@@ -5,6 +5,7 @@
   "packageManager": "yarn@1.22.22",
   "scripts": {
     "dev": "nodemon --watch 'src/**/*.ts' -e ts --exec ts-node src/server.ts",
+    "debug": "node --inspect=127.0.0.1:9229 -r ts-node/register src/server.ts",
     "watch": "tsc --project tsconfig.json --watch",
     "build": "tsc --project tsconfig.build.json",
     "start": "node build/server.js",

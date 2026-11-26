@@ -12,7 +12,8 @@ GraphQL backend for BOT THK, with MongoDB persistence, cookie/JWT authentication
 
 ```sh
 cp .env.example .env
-# Replace the three JWT secrets with independent random values.
+# Generate three independent secrets and copy them into the matching .env entries.
+node -e "const c=require('node:crypto'); for (const k of ['ACCESS_TOKEN_SECRET','REFRESH_TOKEN_SECRET','JWT_RESET_PASSWORD']) console.log(k+'='+c.randomBytes(32).toString('base64url'))"
 yarn install --frozen-lockfile
 yarn test
 yarn lint
@@ -20,7 +21,20 @@ yarn typecheck
 yarn build
 ```
 
-For Docker Compose, `.env` is required by the server service:
+The example secrets are deliberately rejected by the server. Replace all three with independently generated values before starting it.
+
+### Run and debug locally
+
+Use Docker Compose for MongoDB only, then run the TypeScript server directly on the host:
+
+```sh
+docker compose up -d mongo
+yarn dev
+```
+
+The API listens on `http://127.0.0.1:4001`; check `/healthz` for process liveness and `/readyz` for MongoDB readiness. `yarn dev` restarts the server when TypeScript source changes. For a debugger session, open **Run and Debug** in VS Code and select **Debug BOT THK GraphQL API** (F5); it loads `.env`, stops at startup, and maps breakpoints to TypeScript source. Alternatively, run `yarn debug` to start with the Node inspector on loopback port `9229`, then attach your debugger there. Do not expose the inspector port on a public interface.
+
+For the fully containerized setup, `.env` is required by the server service:
 
 ```sh
 docker compose up --build
