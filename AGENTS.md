@@ -35,7 +35,7 @@ git -c core.whitespace=cr-at-eol diff --check
 - Preserve the provider/tool/policy/store interfaces and keep vendor SDK types out of the core.
 - Register tools before constructing `AgentRuntime`; the runtime seals the registry. Validate tool inputs against bounded schemas and authorize before execution.
 - Keep `InMemoryRunStore` test/local only. `MongoRunStore` relies on atomic single-document compare-and-swap updates; deploy indexes deliberately and add real Mongo integration/concurrency tests before production use.
-- The Mongo adapter is not a complete workflow engine: no approval resume/checkpoint, external one-use approval persistence, queue/worker, provider, or public API is implemented.
+- `MongoApprovalStore` now persists pending/approved/rejected/consumed grant state with atomic one-use consumption; it is not wired to `AgentRuntime` or authenticated endpoints. No approval resume/checkpoint, queue/worker, real provider, or public API is implemented.
 - Keep event payloads minimal and redacted. Add tests for cross-tenant isolation, event/version races, cancellation, approval replay, timeouts, and terminal-state rules when changing lifecycle behavior.
 - Update `docs/AGENTIC_HARNESS.md` and `docs/MIGRATION_AND_AGENTIC_HARNESS_PLAN.md` whenever harness capabilities, risks, or implementation status change.
 
