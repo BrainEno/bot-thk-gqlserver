@@ -1,8 +1,7 @@
-import { AuthenticationError } from 'apollo-server-express'
-import { NewLikePayload } from '../interfaces/like.interface'
-import { Topic } from '../topic'
+import { AuthenticationError } from '../errors/graphqlErrors'
+import { publishEvent, Topic } from '../topic'
 import { TContext } from '../types'
-import { Arg, Ctx, Mutation, PubSub, Publisher, Resolver } from 'type-graphql'
+import { Arg, Ctx, Mutation, Resolver } from 'type-graphql'
 import { Types } from 'mongoose'
 import { BlogModel, UserModel } from '../models'
 
@@ -11,9 +10,7 @@ export default class LikeResolvers {
     @Mutation(() => Boolean)
     async toggleLike(
         @Ctx() { user }: TContext,
-        @Arg('blogId') blogId: string,
-        @PubSub(Topic.NewLike)
-        notifyNewLike: Publisher<NewLikePayload>
+        @Arg('blogId') blogId: string
     ) {
         if (!user) {
             throw new AuthenticationError('Not authorized')
@@ -78,7 +75,7 @@ export default class LikeResolvers {
             await liker.updateOne({ likedBlogs: likedBlogIds })
 
             if (!blogBeliked && !likedBlog) {
-                notifyNewLike({
+                await publishEvent(Topic.NewLike, {
                     likedBy: user.name,
                     blogId: blog._id.toString(),
                     blogTitle: blog.title,

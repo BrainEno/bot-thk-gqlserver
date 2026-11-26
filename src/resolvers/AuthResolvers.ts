@@ -1,8 +1,8 @@
-import { ApolloError, AuthenticationError } from 'apollo-server-errors'
+import { randomUUID } from 'node:crypto'
+import { ApolloError, AuthenticationError } from '../errors/graphqlErrors'
 import { isEmail, isEmpty } from 'class-validator'
 import dotenv from 'dotenv'
 import jwt from 'jsonwebtoken'
-import shortId from 'shortid'
 import {
     Arg,
     Ctx,
@@ -26,7 +26,7 @@ import { LoginResponse } from '../dtos/loginResponse'
 import { User } from '../entities/user'
 import { setPassword, verifyPassword } from '../services/passwordService'
 
-dotenv.config()
+dotenv.config({ quiet: true })
 
 export class EmailError extends ApolloError {
     constructor(message: string) {
@@ -75,7 +75,7 @@ class AuthResolvers {
         const isEmailExist = await UserModel.findOne({ email: normalizedEmail })
         if (isEmailExist) throw new EmailError('该邮箱已注册，请登录或找回密码')
 
-        const username = shortId.generate()
+        const username = randomUUID()
         const profile = `${process.env.CLIENT_URL}/profile/${username}`
         const user = new UserModel({
             name: normalizedName,

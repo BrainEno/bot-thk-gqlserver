@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { authChecker } from '../src/middlewares/authChecker'
+import { checkUserRole } from '../src/middlewares/authChecker'
 import { TContext } from '../src/types'
 
 test('requires an authenticated user even when no role is specified', () => {
@@ -11,8 +11,8 @@ test('requires an authenticated user even when no role is specified', () => {
 
     const data = (context: TContext) => ({ context }) as never
 
-    assert.equal(authChecker(data(anonymous), []), false)
-    assert.equal(authChecker(data(authenticated), []), true)
-    assert.equal(authChecker(data(authenticated), ['1']), false)
-    assert.equal(authChecker(data(authenticated), ['0']), true)
+    assert.equal(checkUserRole(data(anonymous), []), false)
+    assert.equal(checkUserRole(data(authenticated), []), true)
+    assert.equal(checkUserRole(data(authenticated), ['1']), false)
+    assert.equal(checkUserRole(data(authenticated), ['0']), true)
 })

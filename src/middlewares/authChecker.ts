@@ -1,15 +1,17 @@
 import { AuthChecker, MiddlewareFn, ResolverData } from 'type-graphql'
 import { TContext } from '../types'
 
-export const authChecker: AuthChecker<TContext> = (
+export const checkUserRole = (
     { context: { user } }: ResolverData<TContext>,
     roles: string[]
-) => {
+): boolean => {
     if (!user) return false
     if (roles.length === 0) return true
 
     return roles.includes(user.role)
 }
+
+export const authChecker: AuthChecker<TContext> = checkUserRole
 
 export const isAdmin: MiddlewareFn<TContext> = ({ context }, next) => {
     if (!context.user) {

@@ -17,7 +17,7 @@ function toErrorWithMessage(maybeError: unknown): ErrorWithMessage {
   }
   try {
     return new Error(JSON.stringify(maybeError));
-  } catch (error) {
+  } catch {
     return new Error(String(maybeError));
   }
 }
