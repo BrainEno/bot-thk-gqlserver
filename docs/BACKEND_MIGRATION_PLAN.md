@@ -63,14 +63,18 @@
 
 ## 4. 依赖现代化策略
 
-截至 2026-11-25 的 npm registry 查询结果中，Apollo Server latest 为 5.5.2、Express 5.3.0、GraphQL 17.1.0、Mongoose 9.13.1、Typegoose 13.5.0、TypeScript 7.0.2、Puppeteer 25.18.1；TypeGraphQL latest tag 是 `2.0.0-rc.3`。这不是已验证兼容矩阵：尤其不能因为某个包存在更高 latest 版本，就直接部署 RC 或跨多个主版本同时升级。
+截至 2026-11-25 的 npm registry 查询结果中，Apollo Server latest 为 5.5.2、Express 5.3.0、GraphQL 17.1.0、Mongoose 9.13.1、Typegoose 13.5.0、TypeScript 7.0.2、Puppeteer 25.18.1；TypeGraphQL latest tag 是 `2.0.0-rc.3`。这是 registry 的 latest 信息，不代表这些版本彼此兼容或适合当前 Node 22/24 运行环境。
+
+**当前依赖迁移状态（PR #61 已合并）：** Apollo Server 5 + Express 5、GraphQL 16.15、TypeGraphQL `2.0.0-rc.3`、TypeScript 6 和 Puppeteer 25 已纳入代码；用户明确接受 TypeGraphQL RC。GraphQL 17 与 GraphQL Scalars 2 不符合 Apollo Server 5 / TypeGraphQL RC3 的 peer dependency 范围。Mongoose 9.9.5 + Typegoose 13.5.0 曾进行 typecheck 探测，但现有 resolver/entity 在严格 ObjectId 查询、populate 投影及文档方法类型上产生数十个 TS 错误；因此目前保留 typecheck/build 通过的 Mongoose 8.24.11 + Typegoose 12.22.0 配对，而不是用宽泛 `any` 掩盖迁移问题。TypeScript 7 也暂缓：当前 `@typescript-eslint` 版本声明只支持 TypeScript `<6.1.0`。`@types/node` 保持与 CI/运行时 Node 22/24 对齐，不跟随 Node 26 最新类型版本。
+
+本轮增加 VS Code launch 配置与 `yarn debug`，便于本地断点调试；完整启动仍需要可用的 MongoDB 服务。
 
 | 当前项/风险 | 候选方向 | 决策门槛 |
 | --- | --- | --- |
-| `apollo-server-express` 3（EOL），并从未声明的 `apollo-server-core` 引入插件 | Apollo Server 5 + 受维护的 Express adapter；对照评估 GraphQL Yoga | 校验 Node 要求、Express adapter、GraphQL 版本、插件、错误格式、SSE 和客户端兼容性；先建最小 spike |
-| TypeGraphQL 1.1 + GraphQL 15 | TypeGraphQL 2 仅在稳定发布后评估；否则评估 Pothos 或 SDL + Yoga | RC 不进生产；比较 decorator 迁移成本、resolver 中间件/验证/授权能力、GraphQL 16/17 peer 范围与长期维护 |
-| Express 4 / TypeScript 4 / Node 18 镜像 | 选一个受支持 Node LTS（倾向 Node 24 LTS）和兼容 TS 稳定版；评估 Express 5 | 至少跑当前生产支持环境与目标 LTS 矩阵；更新 CJS/ESM 和启动配置，不能以放宽 engines 代替验证 |
-| Mongoose 8 + Typegoose 12 | 成对升级到彼此明确支持的版本 | 单独检查 schema hooks、populate、transaction、index 与 TypeScript 类型变化；升级过程中保持 Mongo 数据格式兼容 |
+| Apollo Server 3（EOL）和 Express 4 | 已迁移到 Apollo Server 5 + Express 5 adapter（PR #61） | 保留 GraphQL 16 peer 范围；仍需在有 MongoDB 的环境验证完整 HTTP/SSE 启动与客户端契约 |
+| TypeGraphQL 1.1 + GraphQL 15 | 已迁移到 TypeGraphQL `2.0.0-rc.3` + GraphQL 16.15（用户接受该 RC） | 后续持续验证 resolver、订阅与客户端契约；不擅自升级到 peer 范围不兼容的 GraphQL 17 / GraphQL Scalars 2 |
+| Express 4 / TypeScript 4 / Node 18 镜像 | Express 5、TypeScript 6、Node 22/24 CI | TypeScript 7 等待 `@typescript-eslint` peer 兼容；验证目标 Node 矩阵与启动配置 |
+| Mongoose 8 + Typegoose 12 | 当前使用 Mongoose 8.24.11 + Typegoose 12.22.0；Mongoose 9 / Typegoose 13 探测未通过现有 strict typecheck | 保留当前无 `any` 泛化且 typecheck/build 通过的组合；按实体和 resolver 迁移查询/ObjectId/populate 类型后再升级，不以忽略错误作为完成标志 |
 | `mongoose-autopopulate` | 显式 populate + request-scoped DataLoader | 先有查询基线；防止循环 populate、跨用户缓存和 N+1；建立列表分页/投影/索引 |
 | `shortid` | 首选 Node 内建 `crypto.randomUUID()`；若业务必须短 ID，再评估维护活跃且模块格式兼容的库 | 标识符是否安全敏感、数据库长度/索引、URL 和客户端兼容 |
 | HMAC-SHA1 密码存储；`bcrypt` 已安装但未使用 | 首选 Argon2id；在原生依赖和部署支持不合适时基准 bcrypt | 渐进 rehash：旧格式只作登录校验，通过后立即升级；禁止明文导出/批量解密 |
