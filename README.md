@@ -40,4 +40,4 @@ The CI workflow runs frozen dependency installation, ESLint, TypeScript checking
 
 ## Migration work
 
-The backend migration and agentic harness architecture are documented in [`docs/MIGRATION_AND_AGENTIC_HARNESS_PLAN.md`](docs/MIGRATION_AND_AGENTIC_HARNESS_PLAN.md). Security and engineering remediation tracking is in the repository's GitHub issues.
+The backend migration and agentic harness architecture are documented in [`docs/MIGRATION_AND_AGENTIC_HARNESS_PLAN.md`](docs/MIGRATION_AND_AGENTIC_HARNESS_PLAN.md). The isolated harness prototype and its production gates are described in [`docs/AGENTIC_HARNESS.md`](docs/AGENTIC_HARNESS.md); repository-specific contributor instructions are in [`AGENTS.md`](AGENTS.md). Security and engineering remediation tracking is in the repository's GitHub issues.

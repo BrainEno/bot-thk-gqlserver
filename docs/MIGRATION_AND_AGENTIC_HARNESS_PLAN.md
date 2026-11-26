@@ -16,7 +16,7 @@
 
 尚未完成项包括 refresh token 仅 HttpOnly cookie 流转/服务端重放检测、所有嵌套 GraphQL 类型的用户字段白名单审计（目前仅搜索/资料/关注查询完成脱敏）、GraphQL SSE 订阅级授权、限流/幂等、媒体 SSRF worker、关系写入事务一致性、分页/DataLoader、完整 Mongo 集成测试与数据库对账。Docker daemon 在当前执行环境不可用，因此 Compose/Docker 构建已配置 CI 校验但未在本地执行。
 
-当前分支另已新增隔离的 `src/agentic/` Harness 原型：模型/工具接口、工具注册与 JSON Schema 边界、权限与精确输入摘要审批契约、预算/超时/取消 runtime、内存 run store、脱敏 trace、mock provider 与 golden evaluation；无 GraphQL/API、真实模型或持久化适配。测试与生产缺口详见 [`docs/AGENTIC_HARNESS.md`](./AGENTIC_HARNESS.md)。
+当前分支另已新增隔离的 `src/agentic/` Harness 原型：模型/工具接口、工具注册与 JSON Schema 边界、权限与精确输入摘要审批契约、预算/超时/取消 runtime、内存 run store、脱敏 trace、mock provider 与 golden evaluation。后续增量加入了 Mongoose `MongoRunStore` 与严格 schema、单文档 CAS 转移/事件追加及离线适配器测试；尚无真实 Mongo 集成验证、索引部署/迁移、审批续跑/checkpoint、GraphQL/API 或真实模型。测试与生产缺口详见 [`docs/AGENTIC_HARNESS.md`](./AGENTIC_HARNESS.md)。
 
 ### 当前结构与能力盘点
 
@@ -121,7 +121,7 @@ Harness 的目标是可控地运行、观测、回放和评测 agent，不是一
 
 ### 逻辑边界
 
-**原型进度（本轮）**：已实现独立的 TypeScript runtime、严格工具注册/JSON Schema 参数边界、权限与审批 verifier 契约、限步数/调用数/期限/操作超时/取消、乐观版本内存存储、脱敏事件 trace、fake provider 和 golden evaluator；新增 adversarial key handling、跨租户 scope、审批绑定、预算/超时及取消测试。当前没有真实 provider、Mongo adapter、API、审批续跑/checkpoint 或业务工具，因此仅满足 fake skeleton 和核心 fail-closed 行为，后续步骤仍需逐项完成。实现验收见 [`docs/AGENTIC_HARNESS.md`](./AGENTIC_HARNESS.md)。
+**原型进度（本轮）**：在 fake skeleton 后，增加了 Mongoose `MongoRunStore` 与严格 schema、唯一 run ID / tenant-principal 索引、乐观版本 + 状态 CAS、单文档事件追加、terminal/counter 状态约束，并用 mock collection 覆盖跨范围读取、并发版本冲突、脱敏和状态转移；另外更新根目录 `AGENTS.md` 固化实现边界、验证命令和安全约束。离线测试不等于真实 Mongo 集成：未验证 live Mongo 并发、索引部署、崩溃恢复，也未实现审批续跑/checkpoint、provider、API 或业务工具。实现与生产门禁见 [`docs/AGENTIC_HARNESS.md`](./AGENTIC_HARNESS.md)。
 
 ```text
 AgentRuntime
