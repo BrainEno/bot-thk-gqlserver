@@ -77,6 +77,7 @@ export class InMemoryRunStore implements RunStore {
             toolCallCount?: number
             checkpoint?: RunSnapshot['checkpoint'] | null
             pendingApproval?: RunSnapshot['pendingApproval'] | null
+            event?: RunEvent
         },
         expectedVersion: number
     ): Promise<RunSnapshot> {
@@ -93,7 +94,7 @@ export class InMemoryRunStore implements RunStore {
         ) {
             throw new RunStoreError('run counters must be monotonic and internally consistent')
         }
-        const { checkpoint, pendingApproval, ...ordinaryPatch } = patch
+        const { checkpoint, pendingApproval, event: transitionEvent, ...ordinaryPatch } = patch
         const next = cloneSnapshot({
             ...current,
             ...ordinaryPatch,
@@ -106,6 +107,7 @@ export class InMemoryRunStore implements RunStore {
             status: nextStatus,
             stepCount,
             toolCallCount,
+            events: transitionEvent ? [...current.events, redactEvent(transitionEvent)] : current.events,
             version: current.version + 1,
             updatedAt: this.clock(),
         })

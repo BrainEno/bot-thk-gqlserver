@@ -121,7 +121,7 @@ Harness 的目标是可控地运行、观测、回放和评测 agent，不是一
 
 ### 逻辑边界
 
-**原型进度（截至本轮）**：在 fake skeleton 后，已增加 Mongoose `MongoRunStore` 与严格 schema、唯一 run ID / tenant-principal 索引、乐观版本 + 状态 CAS、单文档事件追加、terminal/counter 状态约束，以及 `MongoApprovalStore` 的 pending/decision/consume 持久状态。当前再补齐 runtime approval suspension/resume：pending action 以 AES-256-GCM 加密 checkpoint 持久化，审批精确绑定 run/principal/tenant/tool/input digest/expiry，审核人与请求人分离，授权原子单次消费；仅获批 action 恢复执行，默认仍无模型联网或生产工具。fake collection 和 deterministic tests 覆盖逻辑边界，但不等于真实 Mongo 集成：live Mongo 并发、索引部署、崩溃恢复、双集合事务/清理策略、密钥管理、provider、API 和业务工具都未验证或实现。实现与生产门禁见 [`docs/AGENTIC_HARNESS.md`](./AGENTIC_HARNESS.md)。
+**原型进度（截至 PR #56 及当前迭代）**：在 fake skeleton 后，已增加 Mongoose `MongoRunStore` 与严格 schema、唯一 run ID / tenant-principal 索引、乐观版本 + 状态 CAS、单文档事件追加、terminal/counter 状态约束，以及 `MongoApprovalStore` 的 pending/decision/consume 持久状态。PR #56 补上 runtime approval suspension/resume：pending action 以 AES-256-GCM 加密 checkpoint 持久化，审批精确绑定 run/principal/tenant/tool/input digest/expiry，审核人与请求人分离，授权原子单次消费；仅获批 action 恢复执行。本轮进一步增加 `AgentApprovalLifecycle`：持久 approve/reject/expire、CAS 失败重试、拒绝/过期时的 run 原子终态事件、租户范围的有界过期扫描；没有创建 HTTP/GraphQL 路由，reviewer/tenant identity 仍由未来可信 auth boundary 注入。fake collection 和 deterministic tests 覆盖逻辑边界，但不等于真实 Mongo 集成：live Mongo 并发、索引部署、崩溃恢复、双集合事务/清理策略、scheduler 部署、密钥管理、provider、API 和业务工具都未验证或实现。实现与生产门禁见 [`docs/AGENTIC_HARNESS.md`](./AGENTIC_HARNESS.md)。
 
 ```text
 AgentRuntime

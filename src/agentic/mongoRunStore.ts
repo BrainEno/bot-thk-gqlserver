@@ -79,6 +79,7 @@ export class MongoRunStore implements RunStore {
             toolCallCount?: number
             checkpoint?: SealedRunCheckpoint | null
             pendingApproval?: PendingApproval | null
+            event?: RunEvent
         },
         expectedVersion: number
     ): Promise<RunSnapshot> {
@@ -108,6 +109,7 @@ export class MongoRunStore implements RunStore {
             stepCount: current.stepCount,
             toolCallCount: current.toolCallCount,
         }
+        const { event: transitionEvent } = patch
         const set: NonNullable<MongoRunUpdate['$set']> = {
             status: nextStatus,
             stepCount,
@@ -122,6 +124,7 @@ export class MongoRunStore implements RunStore {
         const updated = await this.collection.findOneAndUpdate(filter, {
             $inc: { version: 1 },
             $set: set,
+            ...(transitionEvent ? { $push: { events: redactEvent(transitionEvent) } } : {}),
         })
         if (updated) return updated
         return this.throwConflict(id, expectedVersion, 'run version conflict')
@@ -179,7 +182,8 @@ const createRunSchema = (): Schema => {
                 required: true,
                 enum: [
                     'run_created', 'run_started', 'model_step_started', 'tool_call_requested',
-                    'tool_call_denied', 'approval_required', 'approval_resumed', 'run_resumed',
+                    'tool_call_denied', 'approval_required', 'approval_resumed', 'approval_rejected',
+                    'approval_expired', 'run_resumed',
                     'tool_call_started',
                     'tool_call_succeeded', 'tool_call_failed', 'run_succeeded', 'run_failed',
                     'run_cancelled',

@@ -55,6 +55,45 @@ test('Mongo run store persists redacted events with version compare-and-swap', a
     )
 })
 
+test('Mongo run transition atomically appends a redacted lifecycle event and clears checkpoint state', async () => {
+    const store = new MongoRunStore(new FakeMongoCollection(), () => 700)
+    await store.create(makeRun())
+    const running = await store.transition('run-mongo-123', 'running', { stepCount: 1, toolCallCount: 1 }, 0)
+    const waiting = await store.transition('run-mongo-123', 'waiting_for_approval', {
+        checkpoint: {
+            version: 1,
+            algorithm: 'aes-256-gcm',
+            iv: 'iv',
+            authTag: 'tag',
+            ciphertext: 'ciphertext',
+        },
+        pendingApproval: {
+            id: 'opaque-approval-identifier-1234',
+            toolName: 'write_draft',
+            inputDigest: 'a'.repeat(64),
+            expiresAt: 900,
+        },
+    }, running.version)
+    const cancelled = await store.transition('run-mongo-123', 'cancelled', {
+        checkpoint: null,
+        pendingApproval: null,
+        event: {
+            type: 'approval_rejected',
+            at: 650,
+            status: 'cancelled',
+            detail: { approvalId: 'opaque-approval-identifier-1234', token: 'hidden' },
+        },
+    }, waiting.version)
+
+    assert.equal(cancelled.version, waiting.version + 1)
+    assert.equal(cancelled.updatedAt, 700)
+    assert.equal(cancelled.status, 'cancelled')
+    assert.equal(cancelled.checkpoint, undefined)
+    assert.equal(cancelled.pendingApproval, undefined)
+    assert.equal(cancelled.events.length, 1)
+    assert.equal(cancelled.events[0].detail?.token, '[REDACTED]')
+})
+
 test('concurrent Mongo event appends with one version have exactly one winner', async () => {
     const store = new MongoRunStore(new FakeMongoCollection())
     await store.create(makeRun())
