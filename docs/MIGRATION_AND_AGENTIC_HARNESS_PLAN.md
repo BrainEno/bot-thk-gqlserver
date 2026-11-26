@@ -16,7 +16,7 @@
 
 尚未完成项包括 refresh token 仅 HttpOnly cookie 流转/服务端重放检测、所有嵌套 GraphQL 类型的用户字段白名单审计（目前仅搜索/资料/关注查询完成脱敏）、GraphQL SSE 订阅级授权、限流/幂等、媒体 SSRF worker、关系写入事务一致性、分页/DataLoader、完整 Mongo 集成测试与数据库对账。Docker daemon 在当前执行环境不可用，因此 Compose/Docker 构建已配置 CI 校验但未在本地执行。
 
-当前分支另已新增隔离的 `src/agentic/` Harness 原型：模型/工具接口、工具注册与 JSON Schema 边界、权限与精确输入摘要审批契约、预算/超时/取消 runtime、内存 run store、脱敏 trace、mock provider 与 golden evaluation。后续增量加入了 Mongoose `MongoRunStore` 与严格 schema、单文档 CAS 转移/事件追加及离线适配器测试；本轮增加了可选真实 Mongo integration test，并将 Compose Mongo 端口限制发布到主机 loopback，便于本地调试。当前执行环境没有 Docker CLI，所以 integration test 仅在未配置 `AGENTIC_MONGO_URI` 时验证默认 skip；live Mongo 并发、索引部署/迁移仍未验证，审批续跑/checkpoint、GraphQL/API 或真实模型也未实现。测试与生产缺口详见 [`docs/AGENTIC_HARNESS.md`](./AGENTIC_HARNESS.md)。
+当前分支另已新增隔离的 `src/agentic/` Harness 原型：模型/工具接口、工具注册与 JSON Schema 边界、权限与精确输入摘要审批契约、预算/超时/取消 runtime、内存 run store、脱敏 trace、mock provider 与 golden evaluation。后续增量加入了 Mongoose `MongoRunStore` 和 `MongoApprovalStore`：前者单文档 CAS/事件追加，后者持久化 pending/approved/rejected/consumed 审批并以原子更新单次消费，要求不同于 requester 的 reviewer；另有 opt-in Mongo integration test 验证 run CAS 和审批竞态，并将 Compose Mongo 端口限制发布到 loopback。当前执行环境没有 Docker CLI，因此真实 Mongo 集成测试只验证默认 skip，未实连验证 live Mongo/索引部署。审批 store 尚未连接 runtime 生成待审批记录，也没有 review API、resume/checkpoint、GraphQL/API 或真实模型。详见 [`docs/AGENTIC_HARNESS.md`](./AGENTIC_HARNESS.md)。
 
 ### 当前结构与能力盘点
 
