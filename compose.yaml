@@ -4,6 +4,9 @@ services:
     restart: unless-stopped
     volumes:
       - mongo_data:/data/db
+    # Local development only: expose Mongo on loopback, never on all interfaces.
+    ports:
+      - "127.0.0.1:27017:27017"
     healthcheck:
       test: ["CMD", "mongosh", "--quiet", "--eval", "db.runCommand({ ping: 1 }).ok"]
       interval: 10s

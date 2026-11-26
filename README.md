@@ -26,7 +26,14 @@ For Docker Compose, `.env` is required by the server service:
 docker compose up --build
 ```
 
-The API listens on port `4001`. Compose binds it to `127.0.0.1` on the host and keeps MongoDB private to the Compose network. Health endpoints are `/healthz` (process liveness) and `/readyz` (MongoDB readiness); GraphQL HTTP is at `/graphql` and SSE is at `/graphql/stream`.
+The API listens on port `4001`. Compose binds it to `127.0.0.1` on the host. MongoDB is published only on host loopback at `127.0.0.1:27017` for local development (no authentication is configured); do not change this to a public interface or use this setup in production. To start only the local database and run the optional persistence integration test:
+
+```sh
+docker compose up -d mongo
+AGENTIC_MONGO_URI='mongodb://127.0.0.1:27017/bot-thk-agentic?directConnection=true' yarn test:agentic:mongo
+```
+
+The `mongo_data` volume survives `docker compose down`; `docker compose down -v` deletes it and all local Mongo data. Health endpoints are `/healthz` (process liveness) and `/readyz` (MongoDB readiness); GraphQL HTTP is at `/graphql` and SSE is at `/graphql/stream`.
 
 For a local server outside Compose, set `MONGODB_URI` to a reachable MongoDB instance, along with independent `ACCESS_TOKEN_SECRET`, `REFRESH_TOKEN_SECRET`, and `JWT_RESET_PASSWORD` values. SendGrid and Cloudinary credentials are optional unless those integrations are used. Never commit `.env` or use the example secrets in a deployed environment.
 

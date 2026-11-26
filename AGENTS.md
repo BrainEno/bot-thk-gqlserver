@@ -19,7 +19,7 @@ git -c core.whitespace=cr-at-eol diff --check
 ```
 
 - Tests use Node's test runner with `ts-node`; add focused regressions for behavior changes.
-- Docker is not guaranteed to be installed in the development sandbox. State clearly when image/Compose/Mongo integration was not exercised.
+- Docker is not guaranteed to be installed in the development sandbox. State clearly when image/Compose/Mongo integration was not exercised. The opt-in Mongo persistence test runs with `AGENTIC_MONGO_URI=... yarn test:agentic:mongo`; the repository Compose Mongo port is loopback-only for local development.
 - Avoid adding external-network dependencies to unit tests. Use deterministic fakes for provider, database adapter, and services where possible.
 
 ## Security and privacy
