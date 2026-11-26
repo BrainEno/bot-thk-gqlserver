@@ -10,7 +10,8 @@
     "start": "node build/server.js",
     "lint": "eslint . --ext .ts ./src",
     "typecheck": "tsc --noEmit --project tsconfig.json",
-    "test": "node --test -r ts-node/register test/*.spec.ts"
+    "test": "node --test -r ts-node/register test/*.spec.ts",
+    "test:agentic:mongo": "node --test -r ts-node/register test/agenticMongoIntegration.spec.ts"
   },
   "dependencies": {
     "@apollo/utils.keyvaluecache": "^3.1.0",

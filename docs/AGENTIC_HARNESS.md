@@ -43,11 +43,19 @@ yarn test
 yarn build
 ```
 
+The Mongo integration test is opt-in. Start the local database (`docker compose up -d mongo`), then run:
+
+```sh
+AGENTIC_MONGO_URI='mongodb://127.0.0.1:27017/bot-thk-agentic?directConnection=true' yarn test:agentic:mongo
+```
+
+Without `AGENTIC_MONGO_URI`, the opt-in test reports as skipped. The Compose port is bound to loopback and the local database has no authentication; never expose it to a network or reuse it as a production configuration.
+
 Do not register a real side-effect tool for tests that use broad or production credentials. A `read_only` label is a declaration that must be audited against the implementation; the harness cannot prevent a tool from performing a hidden write or network call.
 
 ## Prototype limitations and required production work
 
-1. **Durable state and recovery:** a first `MongoRunStore` adapter and strict Mongoose schema now exist. It uses unique run IDs, scoped reads, atomic version/status compare-and-swap updates, monotonic counters, and redacted append-only events. `InMemoryRunStore` remains test/local only. The Mongo adapter has only fake-collection and schema/index-definition unit tests so far: no live Mongo deployment, index migration, crash/restart test, TTL/retention policy, or production wiring has been verified. Add those before production use.
+1. **Durable state and recovery:** a first `MongoRunStore` adapter and strict Mongoose schema now exist. It uses unique run IDs, scoped reads, atomic version/status compare-and-swap updates, monotonic counters, and redacted append-only events. `InMemoryRunStore` remains test/local only. Offline fake-collection and schema/index-definition tests run in the default suite. An opt-in live test is available as `yarn test:agentic:mongo` when `AGENTIC_MONGO_URI` is set, but it was skipped in this environment because Docker is unavailable and no Mongo URI was provided. No live Mongo concurrency, index deployment/migration, crash/restart test, TTL/retention policy, or production wiring has been verified. Add those before production use.
 2. **Approval UX and atomicity:** no approval endpoint, pending-action checkpoint/resume flow, or production verifier exists. Implement a transactional one-use grant consume operation and bind approval to a human actor, exact displayed arguments, expiry, tenant, run, tool version, and digest. Ensure retries cannot repeat an external side effect; use idempotency keys or an outbox.
 3. **Provider hardening:** no real provider adapter, prompt governance, token/cost accounting, model output moderation, retry policy, or provider data-retention review is included. Add providers behind the interface only after secret handling, timeout behavior, redaction, and vendor privacy review are approved.
 4. **Tool isolation:** the runtime is not a sandbox. Tools execute in-process with application privileges. Any tool that accesses business data must call existing authorized service methods using a trusted principal context; do not pass raw database handles to tools. Add network egress, concurrency, rate, CPU/memory, and per-tool timeout controls at the execution boundary.
