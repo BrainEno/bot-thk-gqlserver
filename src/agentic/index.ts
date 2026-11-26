@@ -1,4 +1,5 @@
 export * from './canonicalJson'
+export * from './checkpointCipher'
 export * from './evaluation'
 export * from './fakeProvider'
 export * from './mongoApprovalStore'

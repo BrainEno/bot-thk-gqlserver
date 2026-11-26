@@ -119,9 +119,12 @@ class FakeMongoCollection implements MongoRunCollection {
     async findOneAndUpdate(filter: MongoRunFilter, update: MongoRunUpdate): Promise<RunSnapshot | null> {
         const current = this.records.get(filter.id)
         if (!current || !matches(current, filter)) return null
+        const set = update.$set ?? {}
         const next: RunSnapshot = {
             ...current,
-            ...update.$set,
+            ...Object.fromEntries(Object.entries(set).filter(([, value]) => value !== null)),
+            checkpoint: set.checkpoint === null ? undefined : set.checkpoint ?? current.checkpoint,
+            pendingApproval: set.pendingApproval === null ? undefined : set.pendingApproval ?? current.pendingApproval,
             version: current.version + (update.$inc?.version ?? 0),
             events: update.$push ? [...current.events, update.$push.events] : current.events,
         }

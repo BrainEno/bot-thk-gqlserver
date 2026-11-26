@@ -1,5 +1,5 @@
 import { Connection, Model, Schema } from 'mongoose'
-import { RunEvent, RunSnapshot, RunStatus, RunStore } from './types'
+import { PendingApproval, RunEvent, RunSnapshot, RunStatus, RunStore, SealedRunCheckpoint } from './types'
 import { redactEvent } from './redaction'
 import { RunStoreError } from './runStore'
 
@@ -13,7 +13,10 @@ export interface MongoRunFilter {
 
 export interface MongoRunUpdate {
     readonly $inc?: { readonly version: number }
-    readonly $set?: Partial<Pick<RunSnapshot, 'status' | 'updatedAt' | 'stepCount' | 'toolCallCount' | 'output'>>
+    readonly $set?: Partial<Pick<RunSnapshot, 'status' | 'updatedAt' | 'stepCount' | 'toolCallCount' | 'output'>> & {
+        readonly checkpoint?: SealedRunCheckpoint | null
+        readonly pendingApproval?: PendingApproval | null
+    }
     readonly $push?: { readonly events: RunEvent }
 }
 
@@ -70,7 +73,13 @@ export class MongoRunStore implements RunStore {
     async transition(
         id: string,
         nextStatus: RunStatus,
-        patch: { output?: string; stepCount?: number; toolCallCount?: number },
+        patch: {
+            output?: string
+            stepCount?: number
+            toolCallCount?: number
+            checkpoint?: SealedRunCheckpoint | null
+            pendingApproval?: PendingApproval | null
+        },
         expectedVersion: number
     ): Promise<RunSnapshot> {
         const current = await this.collection.findOne({ id })
@@ -105,6 +114,10 @@ export class MongoRunStore implements RunStore {
             toolCallCount,
             updatedAt: this.clock(),
             ...(Object.prototype.hasOwnProperty.call(patch, 'output') ? { output: patch.output } : {}),
+            ...(Object.prototype.hasOwnProperty.call(patch, 'checkpoint') ? { checkpoint: patch.checkpoint } : {}),
+            ...(Object.prototype.hasOwnProperty.call(patch, 'pendingApproval')
+                ? { pendingApproval: patch.pendingApproval }
+                : {}),
         }
         const updated = await this.collection.findOneAndUpdate(filter, {
             $inc: { version: 1 },
@@ -166,7 +179,8 @@ const createRunSchema = (): Schema => {
                 required: true,
                 enum: [
                     'run_created', 'run_started', 'model_step_started', 'tool_call_requested',
-                    'tool_call_denied', 'approval_required', 'tool_call_started',
+                    'tool_call_denied', 'approval_required', 'approval_resumed', 'run_resumed',
+                    'tool_call_started',
                     'tool_call_succeeded', 'tool_call_failed', 'run_succeeded', 'run_failed',
                     'run_cancelled',
                 ],
@@ -176,6 +190,25 @@ const createRunSchema = (): Schema => {
             toolName: { type: String, maxlength: 64 },
             status: { type: String, enum: ['queued', 'running', 'waiting_for_approval', 'succeeded', 'failed', 'cancelled'] },
             detail: { type: Schema.Types.Mixed },
+        },
+        { _id: false, strict: 'throw' }
+    )
+    const checkpointSchema = new Schema(
+        {
+            version: { type: Number, required: true, enum: [1] },
+            algorithm: { type: String, required: true, enum: ['aes-256-gcm'] },
+            iv: { type: String, required: true, maxlength: 32 },
+            authTag: { type: String, required: true, maxlength: 32 },
+            ciphertext: { type: String, required: true, maxlength: 1_500_000 },
+        },
+        { _id: false, strict: 'throw' }
+    )
+    const pendingApprovalSchema = new Schema(
+        {
+            id: { type: String, required: true, minlength: 22, maxlength: 128 },
+            toolName: { type: String, required: true, maxlength: 64 },
+            inputDigest: { type: String, required: true, match: /^[a-f0-9]{64}$/ },
+            expiresAt: { type: Number, required: true },
         },
         { _id: false, strict: 'throw' }
     )
@@ -195,6 +228,8 @@ const createRunSchema = (): Schema => {
             createdAt: { type: Number, required: true },
             updatedAt: { type: Number, required: true },
             output: { type: String, maxlength: 32_000 },
+            checkpoint: { type: checkpointSchema },
+            pendingApproval: { type: pendingApprovalSchema },
             events: { type: [eventSchema], default: [] },
         },
         {
@@ -212,6 +247,8 @@ const createRunSchema = (): Schema => {
 const toSnapshot = (value: Record<string, unknown>): RunSnapshot => {
     const snapshot = { ...value }
     delete snapshot._id
+    if (snapshot.checkpoint === null) delete snapshot.checkpoint
+    if (snapshot.pendingApproval === null) delete snapshot.pendingApproval
     return snapshot as unknown as RunSnapshot
 }
 

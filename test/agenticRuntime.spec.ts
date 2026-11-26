@@ -3,6 +3,7 @@ import test from 'node:test'
 import {
     AgentPrincipal,
     AgentTool,
+    AesGcmCheckpointCipher,
     ApprovalGrant,
     ApprovalVerifier,
     InMemoryRunStore,
@@ -13,6 +14,7 @@ import {
     digestJson,
 } from '../src/agentic'
 import { AgentRuntime } from '../src/agentic/runtime'
+import { MemoryApprovalWorkflow } from './helpers/memoryApprovalWorkflow'
 
 const principal: AgentPrincipal = {
     id: 'user-17',
@@ -40,20 +42,29 @@ const makeRuntime = (options: {
     tool?: AgentTool
     policy?: PermissionPolicy
     store?: InMemoryRunStore
-}): { runtime: AgentRuntime; store: InMemoryRunStore; provider: ScriptedFakeProvider } => {
+    approvals?: MemoryApprovalWorkflow
+}): {
+    runtime: AgentRuntime
+    store: InMemoryRunStore
+    provider: ScriptedFakeProvider
+    approvals: MemoryApprovalWorkflow
+} => {
     const store = options.store ?? new InMemoryRunStore()
     const provider = new ScriptedFakeProvider(options.script)
+    const approvals = options.approvals ?? new MemoryApprovalWorkflow()
     const registry = new ToolRegistry()
     if (options.tool) registry.register(options.tool)
     const runtime = new AgentRuntime(
         provider,
         registry,
-        options.policy ?? new PermissionPolicy(),
+        options.policy ?? new PermissionPolicy(approvals),
         store,
         undefined,
-        Date.now
+        Date.now,
+        new AesGcmCheckpointCipher(Buffer.alloc(32, 7)),
+        approvals
     )
-    return { runtime, store, provider }
+    return { runtime, store, provider, approvals }
 }
 
 const runInput = (overrides: Partial<Parameters<AgentRuntime['run']>[0]> = {}) => ({
@@ -173,7 +184,7 @@ test('runtime suspends writes for approval and does not run the side effect', as
         sideEffect: 'write',
         requiredPermissions: ['drafts_write'],
     }
-    const { runtime, store } = makeRuntime({ script: [toolCall('write_draft')], tool: writeTool })
+    const { runtime, store, approvals } = makeRuntime({ script: [toolCall('write_draft')], tool: writeTool })
     const response = await runtime.run(runInput())
     const snapshot = await store.get(response.runId, {
         tenantId: principal.tenantId,
@@ -183,7 +194,86 @@ test('runtime suspends writes for approval and does not run the side effect', as
     assert.equal(writes, 0)
     assert.equal(snapshot?.status, 'waiting_for_approval')
     assert.equal(response.pendingApproval?.toolName, 'write_draft')
+    assert.match(response.pendingApproval?.id ?? '', /^[A-Za-z0-9_-]{22,128}$/)
     assert.match(response.pendingApproval?.inputDigest ?? '', /^[a-f0-9]{64}$/)
+    assert.ok(snapshot?.checkpoint?.ciphertext)
+    assert.equal(JSON.stringify(snapshot).includes('Return a safe test value.'), false)
+    assert.equal(JSON.stringify(snapshot).includes('"hello"'), false)
+    assert.equal((await approvals.get(response.pendingApproval?.id ?? '', principal.tenantId))?.state, 'pending')
+})
+
+test('runtime resumes an encrypted checkpoint after independent approval and executes once', async () => {
+    let writes = 0
+    const writeTool: AgentTool = {
+        ...echoTool(async () => {
+            writes += 1
+            return { saved: true }
+        }),
+        name: 'write_draft',
+        sideEffect: 'write',
+        requiredPermissions: ['drafts_write'],
+    }
+    const { runtime, store, approvals, provider } = makeRuntime({
+        script: [toolCall('write_draft', 'approved content'), { kind: 'final', output: 'saved' }],
+        tool: writeTool,
+    })
+    const first = await runtime.run(runInput())
+    assert.equal(first.status, 'waiting_for_approval')
+    assert.equal(writes, 0)
+    const approvalId = first.pendingApproval?.id
+    assert.ok(approvalId)
+    assert.equal(await approvals.approve(approvalId, principal.tenantId, 'reviewer-2'), true)
+
+    const resumed = await runtime.resume({
+        runId: first.runId,
+        approvalId,
+        principal,
+    })
+    const snapshot = await store.get(first.runId, {
+        tenantId: principal.tenantId,
+        principalId: principal.id,
+    })
+    assert.equal(resumed.status, 'succeeded')
+    assert.equal(resumed.output, 'saved')
+    assert.equal(writes, 1)
+    assert.equal(provider.calls(), 2)
+    assert.equal(snapshot?.checkpoint, undefined)
+    assert.equal(snapshot?.pendingApproval, undefined)
+    assert.equal((await approvals.get(approvalId, principal.tenantId))?.state, 'consumed')
+    await assert.rejects(
+        runtime.resume({ runId: first.runId, approvalId, principal }),
+        /not available/
+    )
+})
+
+test('concurrent resume attempts execute the approved side effect at most once', async () => {
+    let writes = 0
+    const writeTool: AgentTool = {
+        ...echoTool(async () => {
+            writes += 1
+            return { written: true }
+        }),
+        name: 'write_draft',
+        sideEffect: 'write',
+        requiredPermissions: ['drafts_write'],
+    }
+    const { runtime, approvals } = makeRuntime({
+        script: [toolCall('write_draft', 'concurrent approval'), { kind: 'final', output: 'done' }],
+        tool: writeTool,
+    })
+    const pending = await runtime.run(runInput())
+    const approvalId = pending.pendingApproval?.id
+    assert.ok(approvalId)
+    assert.equal(await approvals.approve(approvalId, principal.tenantId, 'reviewer-3'), true)
+
+    const requests = [1, 2].map(() => runtime.resume({
+        runId: pending.runId,
+        approvalId,
+        principal,
+    }))
+    const outcomes = await Promise.allSettled(requests)
+    assert.equal(outcomes.filter((outcome) => outcome.status === 'fulfilled').length, 1)
+    assert.equal(writes, 1)
 })
 
 test('runtime executes a write only with an exact one-use approval', async () => {

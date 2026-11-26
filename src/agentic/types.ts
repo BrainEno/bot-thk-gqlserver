@@ -15,6 +15,8 @@ export type RunEventType =
     | 'tool_call_requested'
     | 'tool_call_denied'
     | 'approval_required'
+    | 'approval_resumed'
+    | 'run_resumed'
     | 'tool_call_started'
     | 'tool_call_succeeded'
     | 'tool_call_failed'
@@ -104,6 +106,32 @@ export interface ApprovalVerifier {
     consume(grant: ApprovalGrant, claims: ApprovalClaims): Promise<boolean>
 }
 
+export interface ApprovalRequestRecord extends ApprovalGrant {
+    readonly state: 'pending' | 'approved' | 'rejected' | 'consumed'
+    readonly requestedBy: string
+    readonly requestedAt: number
+    readonly decidedBy?: string
+    readonly decidedAt?: number
+}
+
+export interface ApprovalWorkflow extends ApprovalVerifier {
+    createPending(grant: ApprovalGrant, requestedBy: string, requestedAt?: number): Promise<void>
+    get(id: string, tenantId: string): Promise<ApprovalRequestRecord | null>
+}
+
+export interface SealedRunCheckpoint {
+    readonly version: 1
+    readonly algorithm: 'aes-256-gcm'
+    readonly iv: string
+    readonly authTag: string
+    readonly ciphertext: string
+}
+
+export interface CheckpointCipher {
+    seal(runId: string, checkpoint: AgentRunCheckpoint): SealedRunCheckpoint
+    open(runId: string, sealed: SealedRunCheckpoint): AgentRunCheckpoint
+}
+
 export type PolicyDecision =
     | { readonly kind: 'allow' }
     | { readonly kind: 'deny'; readonly reason: string }
@@ -128,6 +156,34 @@ export interface AgentBudget {
     readonly maxOutputChars: number
 }
 
+export interface PendingApproval {
+    readonly id: string
+    readonly toolName: string
+    readonly inputDigest: string
+    readonly expiresAt: number
+}
+
+export interface PendingToolAction {
+    readonly callId: string
+    readonly toolName: string
+    readonly input: JsonValue
+    readonly inputDigest: string
+}
+
+/** Encrypted at rest before being included in a RunSnapshot. */
+export interface AgentRunCheckpoint {
+    readonly schemaVersion: 1
+    readonly task: string
+    readonly messages: readonly AgentMessage[]
+    readonly budget: AgentBudget
+    readonly stepCount: number
+    readonly toolCallCount: number
+    readonly pendingAction: PendingToolAction
+    readonly createdAt: number
+    readonly expiresAt: number
+    readonly remainingDurationMs: number
+}
+
 export interface RunEvent {
     readonly type: RunEventType
     readonly at: number
@@ -148,6 +204,8 @@ export interface RunSnapshot {
     readonly createdAt: number
     readonly updatedAt: number
     readonly output?: string
+    readonly checkpoint?: SealedRunCheckpoint
+    readonly pendingApproval?: PendingApproval
     readonly events: readonly RunEvent[]
 }
 
@@ -158,7 +216,13 @@ export interface RunStore {
     transition(
         id: string,
         next: RunStatus,
-        patch: { output?: string; stepCount?: number; toolCallCount?: number },
+        patch: {
+            output?: string
+            stepCount?: number
+            toolCallCount?: number
+            checkpoint?: SealedRunCheckpoint | null
+            pendingApproval?: PendingApproval | null
+        },
         expectedVersion: number
     ): Promise<RunSnapshot>
 }
@@ -176,16 +240,20 @@ export interface AgentRunInput {
     readonly signal?: AbortSignal
 }
 
+export interface AgentResumeInput {
+    readonly runId: string
+    readonly approvalId: string
+    readonly principal: AgentPrincipal
+    readonly signal?: AbortSignal
+}
+
 export interface AgentRunResult {
     readonly runId: string
     readonly status: RunStatus
     readonly output?: string
     readonly steps: number
     readonly toolCalls: number
-    readonly pendingApproval?: {
-        readonly toolName: string
-        readonly inputDigest: string
-    }
+    readonly pendingApproval?: PendingApproval
 }
 
 export interface GoldenCase {
