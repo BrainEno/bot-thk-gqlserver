@@ -1,12 +1,10 @@
-import { AuthenticationError } from "apollo-server-express";
+import { AuthenticationError } from '../errors/graphqlErrors';
 import {
   Resolver,
   Query,
   Arg,
   Ctx,
   Mutation,
-  PubSub,
-  Publisher,
   Subscription,
   Root,
   Args,
@@ -19,9 +17,8 @@ import {
   SendMessageArgs,
   MessageSentPayload,
 } from "../interfaces/message.interface";
-import { Topic } from "../topic";
+import { publishEvent, Topic } from "../topic";
 import {
-  ConversationUpdatedPayload,
   ConversationPopulated,
 } from "../interfaces/conversation.interface";
 import mongoose from "mongoose";
@@ -70,10 +67,6 @@ export default class MessageResolvers {
   async sendMessage(
     @Ctx() { user }: TContext,
     @Args() { conversationId, body, senderId }: SendMessageArgs,
-    @PubSub(Topic.MessageSent)
-    notifyMessageSent: Publisher<MessageSentPayload>,
-    @PubSub(Topic.ConversationUpdated)
-    notifyConversationUpdated: Publisher<ConversationUpdatedPayload>
   ) {
     if (!user) {
       throw new AuthenticationError("Not authorized");
@@ -187,8 +180,8 @@ export default class MessageResolvers {
         )
         .exec()) as unknown as ConversationPopulated;
 
-      notifyMessageSent({ messageSent: newMessage });
-      notifyConversationUpdated({
+      await publishEvent(Topic.MessageSent, { messageSent: newMessage });
+      await publishEvent(Topic.ConversationUpdated, {
         conversationUpdated: {
           conversation: newConversation,
         },

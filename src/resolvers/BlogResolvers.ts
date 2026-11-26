@@ -1,18 +1,16 @@
+import { randomUUID } from 'node:crypto'
 import {
     Arg,
     Ctx,
     Mutation,
-    Publisher,
-    PubSub,
     Query,
     Resolver,
-    ResolverFilterData,
     Root,
     Subscription,
 } from 'type-graphql'
 
 import { BlogInput } from '../entities/blog'
-import { AuthenticationError, UserInputError } from 'apollo-server-express'
+import { AuthenticationError, UserInputError } from '../errors/graphqlErrors'
 import { BlogModel, CategoryModel, TagModel, UserModel } from '../models'
 import { isEmpty } from 'class-validator'
 import { TContext } from '../types'
@@ -24,9 +22,8 @@ import {
 } from '../dtos/blogs'
 import { slugify } from '../utils/slugify'
 import mongoose from 'mongoose'
-import { Topic } from '../topic'
+import { publishEvent, Topic } from '../topic'
 import { NewBlogPayload } from '../interfaces/notification.interface'
-import shortid from 'shortid'
 import { Notification } from '../dtos/notification'
 import { removeDuplicateObjects } from '../utils/removeDuplicateObjects'
 
@@ -279,8 +276,6 @@ class BlogResolvers {
     async createBlog(
         @Ctx() { user }: TContext,
         @Arg('blogInput') blogInput: BlogInput,
-        @PubSub(Topic.NewNotification)
-        notifyAboutNewBlog: Publisher<NewBlogPayload>,
         @Arg('tagIds', () => [String], { nullable: true }) tagIds?: string[]
     ): Promise<NewBlogResponse> {
         if (!user) throw new Error('用户信息不可用，请重新登录')
@@ -326,7 +321,7 @@ class BlogResolvers {
 
             const blog = (await newBlog.save()) as unknown as PopulatedBlog
 
-            await notifyAboutNewBlog({
+            await publishEvent(Topic.NewNotification, {
                 blogSlug: blog.slug,
                 authorUsername: curUser.username,
                 blogTitle: blog.title,
@@ -386,7 +381,6 @@ class BlogResolvers {
         const slugExist = await BlogModel.findOne({ slug })
         if (slugExist && slugExist._id.toString() !== blogId) slug += '(1)'
 
-        prevBlog
         try {
             if (title) prevBlog.title = title
             if (body) prevBlog.body = body
@@ -425,7 +419,7 @@ class BlogResolvers {
         filter: ({
             payload,
             args,
-        }: ResolverFilterData<NewBlogPayload, { followingIds: string[] }>) => {
+        }) => {
             return args.followingIds.includes(payload.authorId)
         },
     })
@@ -439,7 +433,7 @@ class BlogResolvers {
         const linkString = `${payload.authorUsername}__${payload.blogSlug}`
 
         return {
-            id: `blog_${shortid.generate()}`,
+            id: `blog_${randomUUID()}`,
             message,
             linkString,
             dateString: payload.dateString ?? new Date().toISOString(),

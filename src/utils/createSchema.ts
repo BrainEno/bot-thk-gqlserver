@@ -2,6 +2,7 @@ import path from 'path'
 import { buildSchemaSync } from 'type-graphql'
 
 import { authChecker } from '../middlewares/authChecker'
+import { typeGraphqlPubSub } from '../topic'
 import AuthResolvers from '../resolvers/AuthResolvers'
 import BlogResolvers from '../resolvers/BlogResolvers'
 import CatResolvers from '../resolvers/CatResolvers'
@@ -17,6 +18,7 @@ import CommentResolvers from '../resolvers/CommentResolvers'
 
 export const createSchema = () =>
     buildSchemaSync({
+        pubSub: typeGraphqlPubSub,
         resolvers: [
             AuthResolvers,
             UserResolvers,

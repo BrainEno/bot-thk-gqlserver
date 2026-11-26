@@ -1,12 +1,10 @@
-import { AuthenticationError } from "apollo-server-express";
+import { AuthenticationError } from '../errors/graphqlErrors';
 import {
   Arg,
   Ctx,
   Query,
   Mutation,
   Resolver,
-  Publisher,
-  PubSub,
   Subscription,
   Root,
 } from "type-graphql";
@@ -18,7 +16,7 @@ import {
   UserModel,
 } from "../models";
 import { GraphQLError } from "graphql";
-import { Topic } from "../topic";
+import { publishEvent, Topic } from "../topic";
 import {
   ConversationCreatedPayload,
   ConversationUpdatedPayload,
@@ -34,7 +32,7 @@ import {
   PopulatedUser,
 } from "../dtos/conversations";
 
-dotenv.config();
+dotenv.config({ quiet: true });
 
 @Resolver()
 export default class ConversationResolvers {
@@ -101,8 +99,6 @@ export default class ConversationResolvers {
     @Arg("participantUserIds", () => [String])
     participantUserIds: Array<string>,
     @Ctx() { user }: TContext,
-    @PubSub(Topic.ConversationCreated)
-    notifyAboutNewConversation: Publisher<ConversationCreatedPayload>
   ): Promise<string> {
     if (!user) {
       throw new AuthenticationError("Not authorized");
@@ -130,7 +126,7 @@ export default class ConversationResolvers {
 
       if (!participants) throw new Error("Users not find");
 
-      let conversation = await new ConversationModel({
+      const conversation = await new ConversationModel({
         participants: participants.map((p) => p._id),
         participantUserIds: participants.map((p) => p.userId),
       }).save();
@@ -174,9 +170,9 @@ export default class ConversationResolvers {
         ],
       });
 
-      conversation = conversation.toObject();
+      const conversationData = conversation.toObject();
 
-      // console.log(conversation);
+      // console.log(conversationData);
 
       await Promise.all(
         participants.map(async (p) => {
@@ -187,8 +183,8 @@ export default class ConversationResolvers {
         })
       );
 
-      const payload = { ...conversation, participants };
-      notifyAboutNewConversation({
+      const payload = { ...conversationData, participants };
+      await publishEvent(Topic.ConversationCreated, {
         conversationCreated: payload as unknown as ConversationPopulated,
       });
 
@@ -219,8 +215,6 @@ export default class ConversationResolvers {
   async deleteConversation(
     @Arg("conversationId") conversationId: string,
     @Ctx() { user }: TContext,
-    @PubSub(Topic.ConversationDeleted)
-    notifyConversationDeleted: Publisher<ConversationDeletedPayload>
   ) {
     if (!user) {
       throw new AuthenticationError("Not authorized");
@@ -281,7 +275,7 @@ export default class ConversationResolvers {
 
       const conversationDeleted = toDelete as unknown as PopulatedConversation;
 
-      notifyConversationDeleted({
+      await publishEvent(Topic.ConversationDeleted, {
         conversationDeleted,
       });
       return true;
@@ -295,8 +289,6 @@ export default class ConversationResolvers {
     @Ctx() { user }: TContext,
     @Arg("conversationId") conversationId: string,
     @Arg("participantIds", () => [String]) participantIds: Array<string>,
-    @PubSub(Topic.ConversationUpdated)
-    notifyConversationUpdated: Publisher<ConversationUpdatedPayload>
   ) {
     if (!user) {
       throw new AuthenticationError("Not authorized");
@@ -498,7 +490,7 @@ export default class ConversationResolvers {
           removedUserIds: participantsToDelete,
         },
       };
-      notifyConversationUpdated(payload);
+      await publishEvent(Topic.ConversationUpdated, payload);
       return true;
     } catch {
       throw new GraphQLError("Unable to update conversation participants");

@@ -1,48 +1,44 @@
 import 'reflect-metadata'
 
-import {
-    ApolloServerPluginDrainHttpServer,
-    ApolloServerPluginLandingPageDisabled,
-    ApolloServerPluginLandingPageLocalDefault,
-} from 'apollo-server-core'
-import { ApolloServer } from 'apollo-server-express'
+import { ApolloServer, type ApolloServerPlugin } from '@apollo/server'
+import { ApolloServerPluginLandingPageDisabled } from '@apollo/server/plugin/disabled'
+import { ApolloServerPluginDrainHttpServer } from '@apollo/server/plugin/drainHttpServer'
+import { ApolloServerPluginLandingPageLocalDefault } from '@apollo/server/plugin/landingPage/default'
+import { expressMiddleware } from '@as-integrations/express5'
+import { InMemoryLRUCache } from '@apollo/utils.keyvaluecache'
+import { createHandler } from 'graphql-sse/lib/use/express'
+import { GraphQLError } from 'graphql'
+import cookieParser from 'cookie-parser'
+import cors from 'cors'
 import dotenv from 'dotenv'
 import express from 'express'
 import http from 'http'
 import mongoose from 'mongoose'
-import { InMemoryLRUCache } from '@apollo/utils.keyvaluecache'
-import { createHandler } from 'graphql-sse/lib/use/express'
-
-import { createSchema } from './utils/createSchema'
 import {
-    ApolloServerPlugin,
-    GraphQLRequestContext,
-} from 'apollo-server-plugin-base'
-import {
+    fieldExtensionsEstimator,
     getComplexity,
     simpleEstimator,
-    fieldExtensionsEstimator,
 } from 'graphql-query-complexity'
-import cookieParser from 'cookie-parser'
-import { TContext } from './types'
-import cors from 'cors'
+import { ArgumentValidationError } from 'type-graphql'
+
 import { context, getDynamicContext } from './context/typeGraphQLContext'
 import { LogService } from './services/LogService'
-import { ArgumentValidationError } from 'type-graphql'
-// import imagesRoutes from './api/images/routes'
+import { TContext } from './types'
+import { createSchema } from './utils/createSchema'
 
-dotenv.config({ debug: process.env.NODE_ENV === 'development' })
+// Load local development configuration without logging its values.
+dotenv.config({ quiet: true })
 
 const corsOptions = {
     origin: [
-        process.env.CLIENT_URL as string,
+        ...(process.env.CLIENT_URL ? [process.env.CLIENT_URL] : []),
         'https://studio.apollographql.com',
         'https://sendgrid.com',
     ],
     credentials: true,
 }
 
-const MONGODB_URI = process.env.MONGODB_URI ?? 'mongodb://127.0.0.1:27017'
+const MONGODB_URI = process.env.MONGODB_URI ?? 'mongodb://127.0.0.1:27017/bot-thk'
 const REQUIRED_SECRET_NAMES = [
     'ACCESS_TOKEN_SECRET',
     'REFRESH_TOKEN_SECRET',
@@ -58,9 +54,11 @@ const main = async () => {
     }
 
     const logger = new LogService()
-    const port = parseInt(process.env.PORT!, 10) || 4001
+    const parsedPort = Number.parseInt(process.env.PORT ?? '4001', 10)
+    const port = Number.isInteger(parsedPort) && parsedPort > 0 && parsedPort <= 65_535
+        ? parsedPort
+        : 4001
     const schema = createSchema()
-
     const handler = createHandler<Partial<TContext>>({
         schema,
         context: async (req) => getDynamicContext(req),
@@ -93,22 +91,47 @@ const main = async () => {
     app.get('/', (_req, res) => {
         res.status(200).json({ uptime: process.uptime(), message: 'OK' })
     })
-    // app.use('/api/images', imagesRoutes)
 
     const httpServer = http.createServer(app)
 
-    await mongoose.connect(MONGODB_URI)
+    await mongoose.connect(MONGODB_URI, { serverSelectionTimeoutMS: 5_000 })
     logger.log('MongoDB connected')
 
-    const apolloServer = new ApolloServer({
+    const complexityPlugin: ApolloServerPlugin<TContext> = {
+        async requestDidStart() {
+            return {
+                async didResolveOperation({ request, document }) {
+                    const complexity = getComplexity({
+                        schema,
+                        operationName: request.operationName,
+                        query: document,
+                        variables: request.variables,
+                        estimators: [
+                            fieldExtensionsEstimator(),
+                            simpleEstimator({ defaultComplexity: 1 }),
+                        ],
+                    })
+                    if (complexity > 40) {
+                        throw new GraphQLError('GraphQL query exceeds the complexity limit', {
+                            extensions: { code: 'QUERY_TOO_COMPLEX' },
+                        })
+                    }
+                    if (complexity > 0) {
+                        logger.log(`Used query complexity points: ${complexity}`)
+                    }
+                },
+            }
+        },
+    }
+
+    const apolloServer = new ApolloServer<TContext>({
         schema,
-        context,
         formatError: (error) => {
             if (error instanceof ArgumentValidationError) {
                 logger.warn('GraphQL argument validation failed')
                 return error
             }
-            if (error.extensions.code === 'INTERNAL_SERVER_ERROR') {
+            if (error.extensions?.code === 'INTERNAL_SERVER_ERROR') {
                 logger.error('GraphQL request failed')
                 return {
                     message: 'Internal server error',
@@ -127,35 +150,7 @@ const main = async () => {
         }),
         plugins: [
             ApolloServerPluginDrainHttpServer({ httpServer }),
-            {
-                requestDidStart: () => ({
-                    //query complexity
-                    didResolveOperation({
-                        request,
-                        document,
-                    }: GraphQLRequestContext<TContext>) {
-                        const complexity = getComplexity({
-                            schema,
-                            operationName: request.operationName,
-                            query: document!,
-                            variables: request.variables,
-                            estimators: [
-                                fieldExtensionsEstimator(),
-                                simpleEstimator({ defaultComplexity: 1 }),
-                            ],
-                        })
-                        if (complexity > 40) {
-                            throw new Error(
-                                `Sorry, too complicated query! ${complexity} is over 40 that is the max allowed complexity.`
-                            )
-                        }
-                        if (complexity > 0)
-                            logger.log(
-                                `Used query complexity points: ${complexity}`
-                            )
-                    },
-                }),
-            },
+            complexityPlugin,
             ...(process.env.NODE_ENV === 'development'
                 ? [ApolloServerPluginLandingPageLocalDefault({ embed: true })]
                 : [ApolloServerPluginLandingPageDisabled()]),
@@ -163,12 +158,12 @@ const main = async () => {
     })
 
     await apolloServer.start()
-
-    apolloServer.applyMiddleware({
-        app,
-        cors: corsOptions,
-        path: '/graphql',
-    })
+    app.use(
+        '/graphql',
+        expressMiddleware(apolloServer, {
+            context: async ({ req, res }) => context({ req, res }),
+        })
+    )
 
     await new Promise<void>((resolve, reject) => {
         httpServer.once('error', reject)
@@ -198,7 +193,8 @@ const main = async () => {
     process.once('SIGTERM', () => void shutdown())
 }
 
-main().catch(() => {
-    console.error('Server startup failed')
+main().catch((error: unknown) => {
+    const errorName = error instanceof Error ? error.name : 'UnknownError'
+    console.error(`Server startup failed (${errorName})`)
     process.exitCode = 1
 })

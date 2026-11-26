@@ -2,18 +2,12 @@ import {
     Arg,
     Ctx,
     Mutation,
-    PubSub,
-    Publisher,
     Query,
     Resolver,
 } from 'type-graphql'
 import { TContext } from '../types'
-import { Topic } from '../topic'
-import {
-    NewCommentPayload,
-    ReplyCommentPayload,
-} from '../interfaces/comment.interface'
-import { AuthenticationError } from 'apollo-server-express'
+import { publishEvent, Topic } from '../topic'
+import { AuthenticationError } from '../errors/graphqlErrors'
 import { BlogModel } from '../models'
 import { Comment, CommentModel } from '../entities/comment'
 
@@ -59,9 +53,7 @@ export default class CommentResolvers {
     async newComment(
         @Ctx() { user }: TContext,
         @Arg('content') content: string,
-        @Arg('blogId') blogId: string,
-        @PubSub(Topic.NewComment)
-        notifyNewComment: Publisher<NewCommentPayload>
+        @Arg('blogId') blogId: string
     ) {
         if (!user) {
             throw new AuthenticationError('Not authorized')
@@ -91,7 +83,7 @@ export default class CommentResolvers {
 
         await blogToUpdate.updateOne({ comments: commentIds })
 
-        notifyNewComment({
+        await publishEvent(Topic.NewComment, {
             commentedAt: blogId,
             commentedBy: user._id.toString(),
             dateTime: comment.createdAt.toString(),
@@ -116,9 +108,7 @@ export default class CommentResolvers {
     async replyComment(
         @Ctx() { user }: TContext,
         @Arg('commentId') commentId: string,
-        @Arg('content') content: string,
-        @PubSub(Topic.ReplyComment)
-        notifyReplyComment: Publisher<ReplyCommentPayload>
+        @Arg('content') content: string
     ) {
         if (!user) {
             throw new AuthenticationError('Not authorized')
@@ -147,7 +137,7 @@ export default class CommentResolvers {
 
         await toReply.updateOne({ replies: commentIds })
 
-        notifyReplyComment({
+        await publishEvent(Topic.ReplyComment, {
             repliedAt: commentId,
             commentedBy: user._id.toString(),
             dateTime: comment.createdAt.toString(),

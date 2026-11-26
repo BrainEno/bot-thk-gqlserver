@@ -1,12 +1,10 @@
+import { randomUUID } from 'node:crypto'
 import {
   Arg,
   Ctx,
   Mutation,
-  Publisher,
-  PubSub,
   Query,
   Resolver,
-  ResolverFilterData,
   Root,
   Subscription,
 } from 'type-graphql';
@@ -14,11 +12,11 @@ import {
 import { User } from '../entities/user';
 import { TContext } from '../types';
 import { UserModel } from '../models';
-import { AuthenticationError } from 'apollo-server-express';
+import { AuthenticationError } from '../errors/graphqlErrors';
 import { isEmail, isEmpty } from 'class-validator';
-import { Topic } from '../topic';
+import { publishEvent, Topic } from '../topic';
 import { NewFollowerPayload } from '../interfaces/notification.interface';
-import shortid from 'shortid';
+
 import { Notification } from '../dtos/notification';
 import { FollowInfo } from '../dtos/followInfo';
 import { UserInfoResponse } from '../dtos/userInfoResponse';
@@ -105,9 +103,7 @@ class UserResolvers {
   @Mutation(() => Boolean)
   async follow(
     @Ctx() { user }: TContext,
-    @Arg('followName') followName: string,
-    @PubSub(Topic.NewNotification)
-    notifyAboutNewFollower: Publisher<NewFollowerPayload>
+    @Arg('followName') followName: string
   ) {
     if (isEmpty(followName)) throw new Error('该用户不存在');
     try {
@@ -150,7 +146,7 @@ class UserResolvers {
           followerUsername: curUser.username,
         };
 
-        await notifyAboutNewFollower(payload);
+        await publishEvent(Topic.NewNotification, payload);
 
         await curUser.save();
         await toFollow.save();
@@ -258,7 +254,7 @@ class UserResolvers {
     filter: ({
       payload,
       args,
-    }: ResolverFilterData<NewFollowerPayload, { name: string }>) => {
+    }) => {
       return payload.followedName === args.name;
     },
   })
@@ -269,7 +265,7 @@ class UserResolvers {
     console.log('arg name: ', name);
 
     return {
-      id: `user_${shortid.generate()}`,
+      id: `user_${randomUUID()}`,
       message: payload.followerName,
       dateString: payload.dateString ?? new Date().toISOString(),
       linkString: payload.followerUsername,

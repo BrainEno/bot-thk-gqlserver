@@ -6,7 +6,6 @@ import {
 import fs from 'fs'
 import path from 'path'
 import { Request, Response } from 'express'
-import puppeteer from 'puppeteer'
 
 const handleGetRequest = async (publicId: string) => {
     const uploads = await handleGetCloudinaryResource(publicId)
@@ -44,8 +43,9 @@ const handlePostRequest = async ({
     fullPage: boolean
 }) => {
     const getScreenshot = async () => {
+        const { default: puppeteer } = await import('puppeteer')
         const browser = await puppeteer.launch({
-            headless: 'new',
+            headless: true,
             // defaultViewport: { width: 1920, height: 1080 },
             args: minimal_args,
             userDataDir: 'data',
