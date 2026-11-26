@@ -1,5 +1,5 @@
 import { Connection, Model, Schema } from 'mongoose'
-import { ApprovalClaims, ApprovalGrant, ApprovalVerifier } from './types'
+import { ApprovalClaims, ApprovalGrant, ApprovalWorkflow } from './types'
 
 export type ApprovalState = 'pending' | 'approved' | 'rejected' | 'consumed'
 
@@ -42,7 +42,7 @@ export class ApprovalStoreError extends Error {
 }
 
 /** Durable, single-use approval records. Human issuance/decision routes remain separate. */
-export class MongoApprovalStore implements ApprovalVerifier {
+export class MongoApprovalStore implements ApprovalWorkflow {
     constructor(private readonly collection: MongoApprovalCollection) {}
 
     async createPending(

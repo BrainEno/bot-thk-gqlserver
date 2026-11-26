@@ -71,7 +71,13 @@ export class InMemoryRunStore implements RunStore {
     async transition(
         id: string,
         nextStatus: RunStatus,
-        patch: { output?: string; stepCount?: number; toolCallCount?: number },
+        patch: {
+            output?: string
+            stepCount?: number
+            toolCallCount?: number
+            checkpoint?: RunSnapshot['checkpoint'] | null
+            pendingApproval?: RunSnapshot['pendingApproval'] | null
+        },
         expectedVersion: number
     ): Promise<RunSnapshot> {
         const current = this.requireRecord(id, expectedVersion)
@@ -87,9 +93,16 @@ export class InMemoryRunStore implements RunStore {
         ) {
             throw new RunStoreError('run counters must be monotonic and internally consistent')
         }
+        const { checkpoint, pendingApproval, ...ordinaryPatch } = patch
         const next = cloneSnapshot({
             ...current,
-            ...patch,
+            ...ordinaryPatch,
+            ...(Object.prototype.hasOwnProperty.call(patch, 'checkpoint')
+                ? { checkpoint: checkpoint ?? undefined }
+                : {}),
+            ...(Object.prototype.hasOwnProperty.call(patch, 'pendingApproval')
+                ? { pendingApproval: pendingApproval ?? undefined }
+                : {}),
             status: nextStatus,
             stepCount,
             toolCallCount,
@@ -112,6 +125,8 @@ export class InMemoryRunStore implements RunStore {
 
 const cloneSnapshot = (snapshot: RunSnapshot): RunSnapshot => ({
     ...snapshot,
+    checkpoint: snapshot.checkpoint ? { ...snapshot.checkpoint } : undefined,
+    pendingApproval: snapshot.pendingApproval ? { ...snapshot.pendingApproval } : undefined,
     events: snapshot.events.map((event) => ({
         ...event,
         detail: event.detail ? cloneJson(event.detail) as Readonly<Record<string, JsonValue>> : undefined,
