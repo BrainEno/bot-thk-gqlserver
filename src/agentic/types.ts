@@ -16,6 +16,8 @@ export type RunEventType =
     | 'tool_call_denied'
     | 'approval_required'
     | 'approval_resumed'
+    | 'approval_rejected'
+    | 'approval_expired'
     | 'run_resumed'
     | 'tool_call_started'
     | 'tool_call_succeeded'
@@ -107,7 +109,7 @@ export interface ApprovalVerifier {
 }
 
 export interface ApprovalRequestRecord extends ApprovalGrant {
-    readonly state: 'pending' | 'approved' | 'rejected' | 'consumed'
+    readonly state: 'pending' | 'approved' | 'rejected' | 'expired' | 'consumed'
     readonly requestedBy: string
     readonly requestedAt: number
     readonly decidedBy?: string
@@ -117,6 +119,10 @@ export interface ApprovalRequestRecord extends ApprovalGrant {
 export interface ApprovalWorkflow extends ApprovalVerifier {
     createPending(grant: ApprovalGrant, requestedBy: string, requestedAt?: number): Promise<void>
     get(id: string, tenantId: string): Promise<ApprovalRequestRecord | null>
+    approve(id: string, tenantId: string, reviewerId: string, now?: number): Promise<boolean>
+    reject(id: string, tenantId: string, reviewerId: string, now?: number): Promise<boolean>
+    expire(id: string, tenantId: string, now?: number): Promise<boolean>
+    listExpired(tenantId: string, now: number, limit: number): Promise<readonly ApprovalRequestRecord[]>
 }
 
 export interface SealedRunCheckpoint {
@@ -222,6 +228,7 @@ export interface RunStore {
             toolCallCount?: number
             checkpoint?: SealedRunCheckpoint | null
             pendingApproval?: PendingApproval | null
+            event?: RunEvent
         },
         expectedVersion: number
     ): Promise<RunSnapshot>

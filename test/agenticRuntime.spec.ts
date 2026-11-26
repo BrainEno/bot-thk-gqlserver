@@ -4,6 +4,7 @@ import {
     AgentPrincipal,
     AgentTool,
     AesGcmCheckpointCipher,
+    AgentApprovalLifecycle,
     ApprovalGrant,
     ApprovalVerifier,
     InMemoryRunStore,
@@ -244,6 +245,41 @@ test('runtime resumes an encrypted checkpoint after independent approval and exe
         runtime.resume({ runId: first.runId, approvalId, principal }),
         /not available/
     )
+})
+
+test('approval lifecycle approval composes with runtime resume without weakening one-use checks', async () => {
+    let writes = 0
+    const writeTool: AgentTool = {
+        ...echoTool(async () => {
+            writes += 1
+            return { completed: true }
+        }),
+        name: 'write_draft',
+        sideEffect: 'write',
+        requiredPermissions: ['drafts_write'],
+    }
+    const { runtime, store, approvals } = makeRuntime({
+        script: [toolCall('write_draft', 'reviewed text'), { kind: 'final', output: 'published' }],
+        tool: writeTool,
+    })
+    const pending = await runtime.run(runInput())
+    const approvalId = pending.pendingApproval?.id
+    assert.ok(approvalId)
+
+    const lifecycle = new AgentApprovalLifecycle(approvals, store)
+    const decision = await lifecycle.approve({
+        approvalId,
+        runId: pending.runId,
+        tenantId: principal.tenantId,
+        reviewerId: 'reviewer-coordinator',
+    })
+    const result = await runtime.resume({ runId: pending.runId, approvalId, principal })
+
+    assert.equal(decision.outcome, 'approved')
+    assert.equal(result.status, 'succeeded')
+    assert.equal(result.output, 'published')
+    assert.equal(writes, 1)
+    assert.equal((await approvals.get(approvalId, principal.tenantId))?.state, 'consumed')
 })
 
 test('concurrent resume attempts execute the approved side effect at most once', async () => {

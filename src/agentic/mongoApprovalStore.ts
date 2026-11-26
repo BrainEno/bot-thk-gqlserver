@@ -1,7 +1,9 @@
 import { Connection, Model, Schema } from 'mongoose'
 import { ApprovalClaims, ApprovalGrant, ApprovalWorkflow } from './types'
 
-export type ApprovalState = 'pending' | 'approved' | 'rejected' | 'consumed'
+export type ApprovalState = 'pending' | 'approved' | 'rejected' | 'expired' | 'consumed'
+
+export const MAX_APPROVAL_EXPIRY_BATCH_SIZE = 100
 
 export interface StoredApproval extends ApprovalGrant {
     readonly state: ApprovalState
@@ -19,7 +21,7 @@ export interface MongoApprovalFilter {
     readonly principalId?: string
     readonly toolName?: string
     readonly inputDigest?: string
-    readonly expiresAt?: number | { readonly $gt: number }
+    readonly expiresAt?: number | { readonly $gt: number } | { readonly $lte: number }
     readonly state?: ApprovalState
     readonly requestedBy?: string | { readonly $ne: string }
 }
@@ -32,6 +34,7 @@ export interface MongoApprovalCollection {
     insertOne(record: StoredApproval): Promise<void>
     findOne(filter: { readonly id: string; readonly tenantId: string }): Promise<StoredApproval | null>
     findOneAndUpdate(filter: MongoApprovalFilter, update: MongoApprovalUpdate): Promise<StoredApproval | null>
+    listPendingExpired(tenantId: string, now: number, limit: number): Promise<readonly StoredApproval[]>
 }
 
 export class ApprovalStoreError extends Error {
@@ -104,6 +107,31 @@ export class MongoApprovalStore implements ApprovalWorkflow {
         return Boolean(updated)
     }
 
+    async expire(id: string, tenantId: string, now = Date.now()): Promise<boolean> {
+        if (!isApprovalId(id) || !isIdentity(tenantId) || !Number.isFinite(now)) return false
+        const updated = await this.collection.findOneAndUpdate(
+            {
+                id,
+                tenantId,
+                state: 'pending',
+                expiresAt: { $lte: now },
+            },
+            { $set: { state: 'expired', decidedAt: now } }
+        )
+        return Boolean(updated)
+    }
+
+    async listExpired(tenantId: string, now: number, limit: number): Promise<readonly StoredApproval[]> {
+        if (
+            !isIdentity(tenantId) ||
+            !Number.isFinite(now) ||
+            !Number.isInteger(limit) ||
+            limit < 1 ||
+            limit > MAX_APPROVAL_EXPIRY_BATCH_SIZE
+        ) return []
+        return this.collection.listPendingExpired(tenantId, now, limit)
+    }
+
     async consume(grant: ApprovalGrant, claims: ApprovalClaims): Promise<boolean> {
         if (!matchesClaims(grant, claims)) return false
         const updated = await this.collection.findOneAndUpdate(
@@ -152,6 +180,15 @@ class MongooseApprovalCollection implements MongoApprovalCollection {
         }).lean().exec()
         return found ? toStoredApproval(found) : null
     }
+
+    async listPendingExpired(tenantId: string, now: number, limit: number): Promise<readonly StoredApproval[]> {
+        const records = await this.model.find({ tenantId, state: 'pending', expiresAt: { $lte: now } })
+            .sort({ expiresAt: 1, id: 1 })
+            .limit(limit)
+            .lean()
+            .exec()
+        return records.map(toStoredApproval)
+    }
 }
 
 const createApprovalSchema = (): Schema => {
@@ -164,7 +201,7 @@ const createApprovalSchema = (): Schema => {
             toolName: { type: String, required: true, maxlength: 64 },
             inputDigest: { type: String, required: true, match: /^[a-f0-9]{64}$/ },
             expiresAt: { type: Number, required: true },
-            state: { type: String, required: true, enum: ['pending', 'approved', 'rejected', 'consumed'] },
+            state: { type: String, required: true, enum: ['pending', 'approved', 'rejected', 'expired', 'consumed'] },
             requestedBy: { type: String, required: true, maxlength: 128 },
             requestedAt: { type: Number, required: true },
             decidedBy: { type: String, maxlength: 128 },
@@ -179,6 +216,7 @@ const createApprovalSchema = (): Schema => {
     )
     schema.index({ id: 1 }, { unique: true })
     schema.index({ tenantId: 1, runId: 1, state: 1 })
+    schema.index({ tenantId: 1, state: 1, expiresAt: 1, id: 1 })
     schema.index({ expiresAt: 1 })
     return schema
 }

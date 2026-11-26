@@ -106,8 +106,35 @@ test('rejected and expired requests cannot be consumed', async () => {
     const expiredGrant = toGrant(expired)
     await store.createPending(expiredGrant, expired.requestedBy, expired.requestedAt)
     assert.equal(await store.approve(expired.id, tenantId, 'reviewer-1', 400), false)
+    assert.equal(await store.expire(expired.id, tenantId, 399), false)
+    assert.equal(await store.expire(expired.id, tenantId, 400), true)
+    assert.equal(await store.expire(expired.id, tenantId, 401), false)
+    assert.equal(await store.consume(expiredGrant, claimsFor(expiredGrant, 401)), false)
     const expiredStored = await store.get(expired.id, tenantId)
-    assert.equal(expiredStored?.state, 'pending')
+    assert.equal(expiredStored?.state, 'expired')
+    assert.equal(expiredStored?.decidedAt, 400)
+})
+
+test('expired approval listing is tenant-scoped, deterministic, pending-only, and bounded', async () => {
+    const store = new MongoApprovalStore(new FakeMongoApprovalCollection())
+    const first = makeGrant({ expiresAt: 300 })
+    const second = makeGrant({ id: randomUUID(), expiresAt: 200 })
+    const third = makeGrant({ id: randomUUID(), expiresAt: 120 })
+    const otherTenant = makeGrant({ id: randomUUID(), tenantId: 'tenant-other', expiresAt: 150 })
+    const decided = makeGrant({ id: randomUUID(), expiresAt: 150 })
+
+    for (const record of [first, second, third, otherTenant, decided]) {
+        await store.createPending(toGrant(record), record.requestedBy, record.requestedAt)
+    }
+    await store.approve(decided.id, tenantId, 'reviewer-1', 120)
+
+    const page = await store.listExpired(tenantId, 300, 2)
+    assert.deepEqual(page.map((record) => record.id), [third.id, second.id])
+    assert.ok(page.every((record) => record.state === 'pending'))
+    assert.deepEqual(await store.listExpired('tenant-other', 300, 10), [await store.get(otherTenant.id, 'tenant-other')])
+    assert.deepEqual(await store.listExpired(tenantId, 119, 10), [])
+    assert.deepEqual(await store.listExpired(tenantId, 300, 0), [])
+    assert.deepEqual(await store.listExpired(tenantId, 300, 101), [])
 })
 
 test('Mongoose approval schema defines non-TTL audit indexes', () => {
@@ -117,8 +144,12 @@ test('Mongoose approval schema defines non-TTL audit indexes', () => {
         const model = connection.models.AgentApproval
         assert.ok(model)
         assert.equal(model.collection.collectionName, 'agent_approvals')
+        assert.deepEqual(model.schema.path('state')?.options.enum, ['pending', 'approved', 'rejected', 'expired', 'consumed'])
         assert.ok(model.schema.indexes().some(([keys, options]) => keys.id === 1 && options?.unique === true))
         assert.ok(model.schema.indexes().some(([keys]) => keys.tenantId === 1 && keys.runId === 1 && keys.state === 1))
+        assert.ok(model.schema.indexes().some(([keys]) =>
+            keys.tenantId === 1 && keys.state === 1 && keys.expiresAt === 1 && keys.id === 1
+        ))
         assert.ok(model.schema.indexes().some(([keys]) => keys.expiresAt === 1))
         assert.equal(model.schema.indexes().some(([, options]) => Boolean(options?.expireAfterSeconds)), false)
     } finally {
@@ -146,6 +177,14 @@ class FakeMongoApprovalCollection implements MongoApprovalCollection {
         this.records.set(record.id, next)
         return { ...next }
     }
+
+    async listPendingExpired(tenantId: string, now: number, limit: number): Promise<readonly StoredApproval[]> {
+        return [...this.records.values()]
+            .filter((record) => record.tenantId === tenantId && record.state === 'pending' && record.expiresAt <= now)
+            .sort((left, right) => left.expiresAt - right.expiresAt || left.id.localeCompare(right.id))
+            .slice(0, limit)
+            .map((record) => ({ ...record }))
+    }
 }
 
 const matchesFilter = (record: StoredApproval, filter: MongoApprovalFilter): boolean => {
@@ -155,7 +194,10 @@ const matchesFilter = (record: StoredApproval, filter: MongoApprovalFilter): boo
     }
     if (filter.expiresAt !== undefined) {
         if (typeof filter.expiresAt === 'number' && record.expiresAt !== filter.expiresAt) return false
-        if (typeof filter.expiresAt === 'object' && record.expiresAt <= filter.expiresAt.$gt) return false
+        if (typeof filter.expiresAt === 'object') {
+            if ('$gt' in filter.expiresAt && record.expiresAt <= filter.expiresAt.$gt) return false
+            if ('$lte' in filter.expiresAt && record.expiresAt > filter.expiresAt.$lte) return false
+        }
     }
     if (filter.requestedBy !== undefined) {
         if (typeof filter.requestedBy === 'string' && record.requestedBy !== filter.requestedBy) return false

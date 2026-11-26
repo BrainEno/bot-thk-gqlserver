@@ -55,6 +55,27 @@ test('run store rejects invalid transitions, counter rollback, and terminal muta
     )
 })
 
+test('run store can persist a lifecycle event atomically with its state transition', async () => {
+    const store = new InMemoryRunStore(() => 500)
+    await store.create(initialRun())
+    const running = await store.transition('run-12345678', 'running', {}, 0)
+    const cancelled = await store.transition('run-12345678', 'cancelled', {
+        event: {
+            type: 'approval_rejected',
+            at: 499,
+            status: 'cancelled',
+            detail: { approvalId: 'opaque-approval-reference', token: 'never-persist-this' },
+        },
+    }, running.version)
+
+    assert.equal(cancelled.version, running.version + 1)
+    assert.equal(cancelled.updatedAt, 500)
+    assert.equal(cancelled.events.length, 1)
+    assert.equal(cancelled.events[0].type, 'approval_rejected')
+    assert.equal(cancelled.events[0].detail?.token, '[REDACTED]')
+    assert.equal(cancelled.events[0].detail?.approvalId, 'opaque-approval-reference')
+})
+
 test('run store returns deeply isolated snapshots and uses the injected clock', async () => {
     let now = 101
     const store = new InMemoryRunStore(() => now)

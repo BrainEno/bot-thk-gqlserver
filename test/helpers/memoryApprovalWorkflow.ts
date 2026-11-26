@@ -30,6 +30,7 @@ export class MemoryApprovalWorkflow implements ApprovalWorkflow {
             record.tenantId !== tenantId ||
             record.state !== 'pending' ||
             record.requestedBy === reviewerId ||
+            !Number.isFinite(now) ||
             record.expiresAt <= now
         ) return false
         this.records.set(id, { ...record, state: 'approved', decidedBy: reviewerId, decidedAt: now })
@@ -43,10 +44,34 @@ export class MemoryApprovalWorkflow implements ApprovalWorkflow {
             record.tenantId !== tenantId ||
             record.state !== 'pending' ||
             record.requestedBy === reviewerId ||
+            !Number.isFinite(now) ||
             record.expiresAt <= now
         ) return false
         this.records.set(id, { ...record, state: 'rejected', decidedBy: reviewerId, decidedAt: now })
         return true
+    }
+
+    async expire(id: string, tenantId: string, now = Date.now()): Promise<boolean> {
+        const record = this.records.get(id)
+        if (
+            !record ||
+            record.tenantId !== tenantId ||
+            record.state !== 'pending' ||
+            !Number.isFinite(now) ||
+            record.expiresAt > now
+        ) {
+            return false
+        }
+        this.records.set(id, { ...record, state: 'expired', decidedAt: now })
+        return true
+    }
+
+    async listExpired(tenantId: string, now: number, limit: number): Promise<readonly ApprovalRequestRecord[]> {
+        return [...this.records.values()]
+            .filter((record) => record.tenantId === tenantId && record.state === 'pending' && record.expiresAt <= now)
+            .sort((left, right) => left.expiresAt - right.expiresAt || left.id.localeCompare(right.id))
+            .slice(0, limit)
+            .map((record) => ({ ...record }))
     }
 
     async consume(grant: ApprovalGrant, claims: ApprovalClaims): Promise<boolean> {
