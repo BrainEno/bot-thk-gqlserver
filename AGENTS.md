@@ -1,46 +1,44 @@
-# Repository agent instructions
+# Instructions for coding agents
 
-## Project shape
+## Repository purpose
 
-- TypeScript backend using Express, Apollo Server, TypeGraphQL, Mongoose/Typegoose, and Yarn Classic.
-- Keep resolver/controller work thin. Preserve existing API and persisted-data compatibility unless a migration is explicitly planned.
-- `src/agentic/` is an isolated harness package boundary. Do not connect it to GraphQL/HTTP, a real model provider, or production tools without explicit design, authorization, privacy, and operational review.
+This is the BOT THK blog backend: a TypeScript, Express, Apollo Server, TypeGraphQL, and MongoDB service. Its application features include authentication, blog/content APIs, social interactions, messaging, GraphQL subscriptions, email, and Cloudinary integration.
+
+Treat this as an application backend, not an agent platform. The `AGENTS.md` and `docs/AGENT_WORKFLOW.md` files are development instructions for coding agents. They do not describe or require an in-process AgentRuntime, LLM provider, autonomous tool executor, or agent-facing API. Do not add those components unless a clearly scoped product requirement is approved.
+
+## Project conventions
+
+- Keep resolvers and transport handlers thin; put reusable business rules at the existing service/domain boundary.
+- Preserve GraphQL/API and persisted-data compatibility unless the task explicitly includes a migration.
+- Derive identity and tenant/ownership scope from authenticated server context, never from untrusted request arguments.
+- Use allowlisted DTOs for public user data. Never expose password material, tokens, private profile data, or internal relationship identifiers unintentionally.
+- Keep secrets, cookies, authorization headers, and sensitive request bodies out of logs, traces, and test snapshots.
+- Treat external URLs and uploaded content as untrusted. Do not enable screenshot/browser fetching without SSRF controls and process isolation.
+- Avoid speculative abstractions and unrelated refactors. Make only the changes needed for the task's acceptance criteria.
+
+## Agent coordination
+
+Follow [`docs/AGENT_WORKFLOW.md`](docs/AGENT_WORKFLOW.md) for task decomposition, file ownership, independent review, verification, and handoff. A coordinator must assign non-overlapping write ownership to parallel implementers. Review agents inspect and report findings rather than silently rewriting another agent's files.
 
 ## Required checks
 
-Run these before handing off changes:
+Run the checks relevant to the change before handoff; for application code, run all of these:
 
 ```sh
 yarn typecheck
 yarn lint
 yarn test
 yarn build
-git -c core.whitespace=cr-at-eol diff --check
+git diff --check
 ```
 
 - Tests use Node's test runner with `ts-node`; add focused regressions for behavior changes.
-- Docker is not guaranteed to be installed in the development sandbox. State clearly when image/Compose/Mongo integration was not exercised. The opt-in Mongo persistence test runs with `AGENTIC_MONGO_URI=... yarn test:agentic:mongo`; the repository Compose Mongo port is loopback-only for local development.
-- Avoid adding external-network dependencies to unit tests. Use deterministic fakes for provider, database adapter, and services where possible.
+- Use deterministic fakes for external services in unit tests. Do not require network access in the default test suite.
+- If a check cannot be run, state that explicitly and give the reason. Do not report skipped integration tests as passed.
+- For changes to Docker, Compose, Mongo integration, or deployment configuration, report which container/live-service checks were actually executed.
 
-## Security and privacy
+## Change boundaries
 
-- Derive identity and tenant scope from authenticated server context, never from untrusted request arguments. Check object ownership and membership at the service boundary.
-- Use DTO allowlists for public user data. Do not add credentials, tokens, raw passwords, private profiles, or unbounded prompts/tool payloads to logs, traces, GraphQL responses, or persisted audit events.
-- Fail closed on missing authorization, invalid model/tool output, unknown tools, malformed budgets, approval mismatch, and persistence conflicts.
-- Treat each tool's `sideEffect` declaration as an auditable contract, not a sandbox. Tools must use existing authorized service methods; do not expose shell, arbitrary URL, filesystem, or raw database capabilities by default.
-- Side effects require an explicit idempotency/retry strategy. Never automatically replay a real write after uncertain completion.
-
-## Agentic harness rules
-
-- Preserve the provider/tool/policy/store interfaces and keep vendor SDK types out of the core.
-- Register tools before constructing `AgentRuntime`; the runtime seals the registry. Validate tool inputs against bounded schemas and authorize before execution.
-- Keep `InMemoryRunStore` test/local only. `MongoRunStore` relies on atomic single-document compare-and-swap updates; deploy indexes deliberately and add real Mongo integration/concurrency tests before production use.
-- `MongoApprovalStore` now persists pending/approved/rejected/consumed grant state with atomic one-use consumption; it is not wired to `AgentRuntime` or authenticated endpoints. No approval resume/checkpoint, queue/worker, real provider, or public API is implemented.
-- Keep event payloads minimal and redacted. Add tests for cross-tenant isolation, event/version races, cancellation, approval replay, timeouts, and terminal-state rules when changing lifecycle behavior.
-- Update `docs/AGENTIC_HARNESS.md` and `docs/MIGRATION_AND_AGENTIC_HARNESS_PLAN.md` whenever harness capabilities, risks, or implementation status change.
-
-## Documentation and changes
-
-- Update relevant docs and this file when architecture, commands, security boundaries, or operational requirements change.
-- Keep migrations additive and deployable; document index creation, retention, rollback, and backfill requirements.
-- Prefer focused changes with explicit limitations over claiming production readiness based on unit tests alone.
+- Do not add an LLM SDK, agent runtime, agent-specific persistence, agent tools, or GraphQL agent endpoints as an incidental part of a backend task.
+- If a product request explicitly asks for an AI feature, first document the use case, user-facing API, data access rules, privacy/security risks, and operational ownership. Keep that design review separate from the coding-agent workflow in this repository.
+- Do not change branches or overwrite unrelated work. Inspect `git status` before editing and preserve existing user changes.
