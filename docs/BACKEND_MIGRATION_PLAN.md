@@ -1,6 +1,6 @@
-# 后端整体迁移与 Agentic Harness 基座路线图
+# BOT THK GraphQL 后端迁移路线图
 
-> 审查基线：`b8e75c6`（当前分支 `arena/afccf877-bot-thk-gqlserver`）。
+> 历史审查基线：`b8e75c6`。本文是迁移计划与早期审查记录，不是实时状态面板；当前实现状态以代码、CI 和活跃 issue 为准。
 > 范围：本次审阅了已跟踪的 TypeScript 源码、GraphQL SDL、依赖/锁文件、TypeScript/ESLint、Docker/Compose 配置，以及当前 GitHub 开放审计 issue。未改动业务实现。
 > 证据边界：仓库没有测试、没有 CI，也没有安装依赖目录；因此本次不能把静态判断冒称为完整的运行时验证。依赖候选版本仅通过 npm registry 查询，升级兼容性须由迁移 spike 和 CI 证明。
 
@@ -8,15 +8,15 @@
 
 这是一个由 Express + Apollo Server 3 + TypeGraphQL + Mongoose/Typegoose 组成的 GraphQL 后端，同时包含 SSE 订阅、认证、内容/社交关系、私信和 Cloudinary/Puppeteer 图片能力。业务面覆盖较完整，但目前安全、授权、一致性、可观测性和工程验证存在多个高风险缺口；不能把“依赖升到最新”当成单独的版本更新任务，必须先固定 API/数据契约并建立测试与回滚能力，再按业务域分阶段迁移。
 
-建议顺序是：**P0 安全止血 → 建立 CI/测试与运行时基线 → GraphQL/HTTP 迁移 spike → 数据/服务层重整 → 按业务域切片迁移 → 灰度与清理**。Agentic harness 作为独立、默认不对公网开放的模块建设，第一阶段不接真实模型、不开放任意工具执行。
+建议顺序是：**P0 安全止血 → 建立 CI/测试与运行时基线 → GraphQL/HTTP 迁移 spike → 数据/服务层重整 → 按业务域切片迁移 → 灰度与清理**。
 
-### 当前分支进度
+### 早期迁移批次记录（历史摘要）
 
-已落地第一批止血与工程基线改动：修正匿名用户通过 `authChecker`、刷新/登录/忘记密码日志泄漏、使用 scrypt 建立新密码哈希并在旧 HMAC-SHA1 登录成功后渐进升级、密码重置改为短时签名 token 并在一次成功后失效、文章写操作所有权检查、会话读写/消息发送成员检查及已读字段修正；搜索用户/用户资料/关注列表改用白名单 DTO，不再返回邮箱和关系 ID；启动时 Mongo 连接失败会失败退出，加入 `/healthz`/`/readyz` 与 SIGINT/SIGTERM 停机，生产禁用内联 trace/landing page/schema 文件写入，修复 Docker 生产启动路径与 Compose 配置，并加入 CI、README、env 示例和 6 个单元/schema 测试。详见当前工作分支差异。
+初始迁移期间已落地第一批止血与工程基线改动：修正匿名用户通过 `authChecker`、刷新/登录/忘记密码日志泄漏、使用 scrypt 建立新密码哈希并在旧 HMAC-SHA1 登录成功后渐进升级、密码重置改为短时签名 token 并在一次成功后失效、文章写操作所有权检查、会话读写/消息发送成员检查及已读字段修正；搜索用户/用户资料/关注列表改用白名单 DTO，不再返回邮箱和关系 ID；启动时 Mongo 连接失败会失败退出，加入 `/healthz`/`/readyz` 与 SIGINT/SIGTERM 停机，生产禁用内联 trace/landing page/schema 文件写入，修复 Docker 生产启动路径与 Compose 配置，并加入 CI、README、env 示例和 6 个单元/schema 测试。此处仅记录早期迁移批次，具体现状请以当前代码与 CI 为准。
 
-尚未完成项包括 refresh token 仅 HttpOnly cookie 流转/服务端重放检测、所有嵌套 GraphQL 类型的用户字段白名单审计（目前仅搜索/资料/关注查询完成脱敏）、GraphQL SSE 订阅级授权、限流/幂等、媒体 SSRF worker、关系写入事务一致性、分页/DataLoader、完整 Mongo 集成测试与数据库对账。Docker daemon 在当前执行环境不可用，因此 Compose/Docker 构建已配置 CI 校验但未在本地执行。
+早期审查列出的后续待办包括 refresh token 仅 HttpOnly cookie 流转/服务端重放检测、所有嵌套 GraphQL 类型的用户字段白名单审计（目前仅搜索/资料/关注查询完成脱敏）、GraphQL SSE 订阅级授权、限流/幂等、媒体 SSRF worker、关系写入事务一致性、分页/DataLoader、完整 Mongo 集成测试与数据库对账。Docker daemon 在当前执行环境不可用，因此 Compose/Docker 构建已配置 CI 校验但未在本地执行。
 
-当前分支另已新增隔离的 `src/agentic/` Harness 原型：模型/工具接口、工具注册与 JSON Schema 边界、权限与精确输入摘要审批契约、预算/超时/取消 runtime、内存 run store、脱敏 trace、mock provider 与 golden evaluation。后续增量加入了 Mongoose `MongoRunStore` 和 `MongoApprovalStore`：前者单文档 CAS/事件追加，后者持久化 pending/approved/rejected/consumed 审批并以原子更新单次消费，要求不同于 requester 的 reviewer；另有 opt-in Mongo integration test 验证 run CAS 和审批竞态，并将 Compose Mongo 端口限制发布到 loopback。当前执行环境没有 Docker CLI，因此真实 Mongo 集成测试只验证默认 skip，未实连验证 live Mongo/索引部署。审批 store 尚未连接 runtime 生成待审批记录，也没有 review API、resume/checkpoint、GraphQL/API 或真实模型。详见 [`docs/AGENTIC_HARNESS.md`](./AGENTIC_HARNESS.md)。
+本仓库中的 AI coding-agent 使用方式仅由根目录 `AGENTS.md` 与 [`AGENT_WORKFLOW.md`](./AGENT_WORKFLOW.md) 约定。这些是供开发代理阅读的协作说明，不构成后端运行时组件，也不代表需要在服务中部署 Agent。
 
 ### 当前结构与能力盘点
 
@@ -57,7 +57,6 @@
 
 - **已有审计**：#1–#47，覆盖本次列出的安全、业务、数据、运维、工程和 CI 发现。
 - **迁移总控**：[#48 后端整体迁移与依赖现代化](https://github.com/BrainEno/bot-thk-gqlserver/issues/48)。覆盖全部业务域、兼容性 spike、阶段验收和回滚策略。
-- **Harness 基座**：[#49 Agentic harness 开发基座](https://github.com/BrainEno/bot-thk-gqlserver/issues/49)。
 - **Issue 治理**：[#50 审计 issue 去重与证据/优先级校准](https://github.com/BrainEno/bot-thk-gqlserver/issues/50)。
 
 本次没有为 #1–#47 已记录的问题重复开票。issue 的“实测”描述应在执行修复时附可重现证据；若不能复现，应在治理时改为“静态判断”，不可把历史描述当成此轮已经运行验证。
@@ -115,45 +114,12 @@
 
 **最终门禁**：SLO/告警有效、回滚演练通过、无 EOL/未批准 RC 生产依赖、依赖漏洞与许可检查有明确豁免记录。
 
-## 6. Agentic Harness 开发基座
+## 6. AI coding-agent 协作约定
 
-Harness 的目标是可控地运行、观测、回放和评测 agent，不是一个能任意调用 shell 或直接写业务数据库的 chatbot。建议初期作为独立模块/内部包（例如 `packages/agentic-harness`），不与 GraphQL resolver 混在一起，不默认开放公网入口；先提供 fake provider 和无副作用工具。
-
-### 逻辑边界
-
-**原型进度（截至 PR #56 及当前迭代）**：在 fake skeleton 后，已增加 Mongoose `MongoRunStore` 与严格 schema、唯一 run ID / tenant-principal 索引、乐观版本 + 状态 CAS、单文档事件追加、terminal/counter 状态约束，以及 `MongoApprovalStore` 的 pending/decision/consume 持久状态。PR #56 补上 runtime approval suspension/resume：pending action 以 AES-256-GCM 加密 checkpoint 持久化，审批精确绑定 run/principal/tenant/tool/input digest/expiry，审核人与请求人分离，授权原子单次消费；仅获批 action 恢复执行。本轮进一步增加 `AgentApprovalLifecycle`：持久 approve/reject/expire、CAS 失败重试、拒绝/过期时的 run 原子终态事件、租户范围的有界过期扫描；没有创建 HTTP/GraphQL 路由，reviewer/tenant identity 仍由未来可信 auth boundary 注入。当前迭代再增加 versioned offline evaluation suites：校验 fixture schema/budget/tenant binding，重复执行并比较隐私安全 transcript fingerprint，覆盖 tool/event/counter/approval assertions，输出不含 task/output/exception 原文的安全报告并执行 score/stability gate。fake collection 和 deterministic tests 覆盖逻辑边界，但不等于真实 Mongo 集成：live Mongo 并发、索引部署、崩溃恢复、双集合事务/清理策略、scheduler 部署、密钥管理、真实 provider 质量/成本门禁、API 和业务工具都未验证或实现。实现与生产门禁见 [`docs/AGENTIC_HARNESS.md`](./AGENTIC_HARNESS.md)。
-
-```text
-AgentRuntime
-  ├── ModelProvider (接口；provider adapter 单独审批)
-  ├── ToolRegistry -> ToolPolicy/Approval -> ToolExecutor (默认拒绝)
-  ├── RunStore / Checkpoint / EventLog
-  ├── Budget + Deadline + Cancellation
-  └── Trace + Evaluator + Replay
-```
-
-- **Runtime**：明确状态机（queued/running/waiting-for-approval/succeeded/failed/cancelled）、最大轮数、token/成本/时长预算、重试/并发上限；HTTP handler 不直接持有长时间 agent loop。
-- **Provider adapter**：厂商无关的输入/输出/usage/error 接口；不在初始阶段选供应商或把 SDK 类型泄漏进领域层；密钥使用 secret store，不进入配置样例和日志。
-- **Tool registry**：每个工具声明名称、版本、JSON Schema、所需权限、超时、速率/资源上限、是否有副作用和人工审批要求。未知工具/无权限/无效参数全部拒绝；默认没有 shell、任意网络、文件系统或直接数据库写权限。
-- **Policy/approval**：执行前依据用户/租户/资源授权；外部写入、发送消息、发布内容等动作先展示参数并等待明确批准；批准 token 短期、单次、与参数摘要绑定。
-- **持久化与恢复**：run/step/tool output/event 都有 schema version；checkpoint 可恢复，命令幂等；跨服务副作用用 outbox 或明确的补偿操作；禁止盲目重放真实副作用。
-- **Tracing 与隐私**：runId/stepId/toolCallId 全链路关联；记录成本/延迟/决策理由摘要和审计结果；prompt、用户资料、token、凭证按字段脱敏/最小保留；日志不存完整秘密或不必要的原文。
-- **Eval**：确定性 fake model/tool 的单元和契约测试；策略拒绝/预算/超时/取消/重试/恢复测试；版本化 golden tasks、期望行为与安全回归；离线评测有质量、成本、延迟门槛。真实模型调用不在默认 PR CI 运行。
-
-### Harness 建设步骤
-
-1. ADR：威胁模型、信任边界、租户隔离、运行数据保留、审批定义、provider 与队列选择标准。
-2. 无外部网络的 skeleton：接口、状态机、fake provider、2–3 个只读/纯函数工具；不接真实数据库写权限。
-3. Tool registry、policy、预算、deadline/cancel、结构化事件和 checkpoint；测试“默认拒绝”。
-4. 离线 eval/replay 与 CI 门禁；为 prompt/tool/schema 变更做版本化和回归。
-5. 经安全审查后再加一个 provider adapter；再经产品/隐私/运维审批后，逐个加入有限权限的真实工具。
-6. 只有当内部评测、授权与审计成熟后，另开产品化 issue 讨论 GraphQL/API 入口、用户界面、配额和 SLO。
-
-**完成定义**：fake task 可重复得出稳定结果；未注册工具、超预算、未授权和超时都 fail closed；可取消/恢复；日志/trace 无秘密；不会绕过现有 service 授权；CI 无外部模型依赖。
+仓库级编码要求见 [`AGENTS.md`](../AGENTS.md)，多代理任务分解、文件所有权、独立审查、验证和交接流程见 [`AGENT_WORKFLOW.md`](./AGENT_WORKFLOW.md)，可复用任务单见 [`AGENT_TASK_TEMPLATE.md`](./AGENT_TASK_TEMPLATE.md)。这些文档只规范开发代理如何协助维护本后端，不在应用中运行 Agent，不新增模型/provider、AgentRuntime、Agent 工具、Agent 专用持久化或 Agent API。任何未来 AI 产品功能都必须由单独、明确批准的产品需求和安全设计开启。
 
 ## 7. 下一步建议
 
 1. 先对 #1–#47 做 P0/P1 排序和 #50 去重，不要以框架迁移掩盖现有漏洞。
 2. 将 #23 作为第一批实现：CI/基础测试和可工作的容器启动路径；然后补核心权限回归。
 3. 由 #48 承接兼容 spike、迁移 ADR、API/数据契约和分阶段 PR；依赖升级拆成可回滚小步。
-4. 同期只推进 #49 的 ADR 与 fake skeleton；等基础 CI 和服务层权限边界稳定后再接 provider/真实工具。
