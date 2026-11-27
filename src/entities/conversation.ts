@@ -1,5 +1,4 @@
 import {
-  DocumentType,
   modelOptions,
   pre,
   prop,
@@ -7,12 +6,11 @@ import {
   Severity,
 } from "@typegoose/typegoose";
 import { ObjectIdScalar as ObjectId } from "../utils/ObjectIdScalar";
-import { ObjectId as ObjectID } from "mongoose";
+import { Types } from "mongoose";
 import { Field, ObjectType } from "type-graphql";
 
 import { Message } from "./message";
 import { Participant } from "./participant";
-import { ParticipantModel } from "../models";
 
 @modelOptions({
   schemaOptions: {
@@ -27,7 +25,7 @@ import { ParticipantModel } from "../models";
 })
 export class Conversation {
   @Field(() => ObjectId)
-  readonly _id: ObjectID;
+  readonly _id: Types.ObjectId;
 
   @prop({
     autopopulate: true,
@@ -58,11 +56,4 @@ export class Conversation {
 
   @Field(() => Date)
   updatedAt?: Date;
-
-  public async getParticipantUserIds(this: DocumentType<Conversation>) {
-    const participants = await ParticipantModel.find({
-      conversationId: this._id.toString(),
-    });
-    return participants.map((p) => p.userId);
-  }
 }

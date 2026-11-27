@@ -13,8 +13,6 @@ export const smartTrim = (
 
   const isHan = isHanReg(str);
 
-  console.log("isHan", isHan);
-
   if (str.length <= length) return str;
 
   let trimmedStr = isHan

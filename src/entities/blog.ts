@@ -5,7 +5,7 @@ import { Category } from './category'
 import { Comment } from './comment'
 import { Tag } from './tag'
 import { ObjectIdScalar as ObjectId } from '../utils/ObjectIdScalar'
-import { ObjectId as ObjectID } from 'mongoose'
+import { Types } from 'mongoose'
 import { User } from './user'
 import { TimeStamps } from '@typegoose/typegoose/lib/defaultClasses'
 
@@ -18,7 +18,7 @@ import { TimeStamps } from '@typegoose/typegoose/lib/defaultClasses'
 })
 export class Blog extends TimeStamps {
     @Field(() => ObjectId)
-    readonly _id: ObjectID
+    readonly _id: Types.ObjectId
 
     @prop({
         type: () => String,

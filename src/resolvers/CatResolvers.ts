@@ -1,3 +1,4 @@
+import { logFailure } from '../services/LogService'
 import { Arg, Authorized, Mutation, Query, Resolver } from 'type-graphql'
 import { Blog } from '../entities/blog'
 
@@ -14,7 +15,7 @@ class CatResolvers {
             if (cats) return cats
             return []
         } catch (error) {
-            console.log(error)
+            logFailure('resolver.category.operation.failed', error)
             return []
         }
     }
@@ -41,7 +42,7 @@ class CatResolvers {
             }
             return []
         } catch (error) {
-            console.log(error)
+            logFailure('resolver.category.operation.failed', error)
             return []
         }
     }
@@ -57,7 +58,7 @@ class CatResolvers {
             })
             return !!newTag
         } catch (error) {
-            console.log(error)
+            logFailure('resolver.category.operation.failed', error)
             return false
         }
     }

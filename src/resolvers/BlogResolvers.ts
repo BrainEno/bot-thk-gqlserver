@@ -1,18 +1,17 @@
+import { logFailure } from '../services/LogService'
+import { randomUUID } from 'node:crypto'
 import {
     Arg,
     Ctx,
     Mutation,
-    Publisher,
-    PubSub,
     Query,
     Resolver,
-    ResolverFilterData,
     Root,
     Subscription,
 } from 'type-graphql'
 
 import { BlogInput } from '../entities/blog'
-import { UserInputError } from 'apollo-server-express'
+import { AuthenticationError, UserInputError } from '../errors/graphqlErrors'
 import { BlogModel, CategoryModel, TagModel, UserModel } from '../models'
 import { isEmpty } from 'class-validator'
 import { TContext } from '../types'
@@ -24,9 +23,8 @@ import {
 } from '../dtos/blogs'
 import { slugify } from '../utils/slugify'
 import mongoose from 'mongoose'
-import { Topic } from '../topic'
+import { publishEvent, Topic } from '../topic'
 import { NewBlogPayload } from '../interfaces/notification.interface'
-import shortid from 'shortid'
 import { Notification } from '../dtos/notification'
 import { removeDuplicateObjects } from '../utils/removeDuplicateObjects'
 
@@ -50,7 +48,7 @@ class BlogResolvers {
                 .exec()
             return blogs as unknown as PopulatedCardBlog[]
         } catch (error) {
-            console.log(error)
+            logFailure('resolver.blog.operation.failed', error)
             return []
         }
     }
@@ -80,7 +78,7 @@ class BlogResolvers {
             if (!blog) throw new Error(`not found blog with slug ${slug}`)
             return blog
         } catch (err) {
-            console.log(err)
+            logFailure('resolver.blog.operation.failed', err)
             throw err
         }
     }
@@ -109,7 +107,7 @@ class BlogResolvers {
             if (!blog) throw new Error(`not found blog with id ${blogId}`)
             return blog as unknown as PopulatedBlog
         } catch (err) {
-            console.log(err)
+            logFailure('resolver.blog.operation.failed', err)
             throw err
         }
     }
@@ -181,7 +179,7 @@ class BlogResolvers {
                 throw new Error(`not found blogs related with slug ${slug}`)
             return blogs as unknown as PopulatedCardBlog[]
         } catch (err) {
-            console.log(err)
+            logFailure('resolver.blog.operation.failed', err)
             throw err
         }
     }
@@ -223,7 +221,7 @@ class BlogResolvers {
                 throw new Error(`not found blogs belongs to user: ${userId}`)
             return blogs
         } catch (err) {
-            console.log(err)
+            logFailure('resolver.blog.operation.failed', err)
             throw err
         }
     }
@@ -265,7 +263,7 @@ class BlogResolvers {
             if (!blogs) throw new Error(`not found blogs liked by user: ${id}`)
             return blogs
         } catch (err) {
-            console.log(err)
+            logFailure('resolver.blog.operation.failed', err)
             throw err
         }
     }
@@ -279,8 +277,6 @@ class BlogResolvers {
     async createBlog(
         @Ctx() { user }: TContext,
         @Arg('blogInput') blogInput: BlogInput,
-        @PubSub(Topic.NewNotification)
-        notifyAboutNewBlog: Publisher<NewBlogPayload>,
         @Arg('tagIds', () => [String], { nullable: true }) tagIds?: string[]
     ): Promise<NewBlogResponse> {
         if (!user) throw new Error('用户信息不可用，请重新登录')
@@ -326,7 +322,7 @@ class BlogResolvers {
 
             const blog = (await newBlog.save()) as unknown as PopulatedBlog
 
-            await notifyAboutNewBlog({
+            await publishEvent(Topic.NewNotification, {
                 blogSlug: blog.slug,
                 authorUsername: curUser.username,
                 blogTitle: blog.title,
@@ -339,7 +335,7 @@ class BlogResolvers {
 
             return { success: true, blog }
         } catch (error) {
-            console.log(error)
+            logFailure('resolver.blog.operation.failed', error)
             return { success: false, blog: null }
         }
     }
@@ -355,11 +351,13 @@ class BlogResolvers {
 
         if (!blogInput) throw new Error('缺少必要信息，完善后重新提交')
 
-        const prevBlog = await BlogModel.findOne({
-            _id: blogId,
-        })
+        const prevBlog = await BlogModel.findOne(
+            user.role === '1'
+                ? { _id: blogId }
+                : { _id: blogId, author: user._id }
+        )
 
-        if (!prevBlog) throw new Error('加载草稿错误')
+        if (!prevBlog) throw new AuthenticationError('Not authorized')
 
         const { body, title, imageUri, active } = blogInput
 
@@ -384,7 +382,6 @@ class BlogResolvers {
         const slugExist = await BlogModel.findOne({ slug })
         if (slugExist && slugExist._id.toString() !== blogId) slug += '(1)'
 
-        prevBlog
         try {
             if (title) prevBlog.title = title
             if (body) prevBlog.body = body
@@ -399,7 +396,7 @@ class BlogResolvers {
 
             return { success: true, blog: newBlog }
         } catch (error) {
-            console.log(error)
+            logFailure('resolver.blog.operation.failed', error)
             return { success: false, blog: null }
         }
     }
@@ -410,8 +407,12 @@ class BlogResolvers {
         @Arg('blogId') blogId: string
     ) {
         if (!user) throw new Error('当前用户信息不可用，请重新登录')
-        const res = await BlogModel.findOneAndDelete({ _id: blogId })
-        return res !== null
+        const deleted = await BlogModel.findOneAndDelete(
+            user.role === '1'
+                ? { _id: blogId }
+                : { _id: blogId, author: user._id }
+        )
+        return deleted !== null
     }
 
     @Subscription(() => Notification, {
@@ -419,7 +420,7 @@ class BlogResolvers {
         filter: ({
             payload,
             args,
-        }: ResolverFilterData<NewBlogPayload, { followingIds: string[] }>) => {
+        }) => {
             return args.followingIds.includes(payload.authorId)
         },
     })
@@ -427,13 +428,14 @@ class BlogResolvers {
         @Root() payload: NewBlogPayload,
         @Arg('followingIds', () => [String]) followingIds: string[]
     ): Notification {
-        console.log('arg followingIds', followingIds)
+        // Keep the legacy subscription argument in the schema contract.
+        void followingIds
 
         const message = `${payload.authorName}__${payload.blogTitle}`
         const linkString = `${payload.authorUsername}__${payload.blogSlug}`
 
         return {
-            id: `blog_${shortid.generate()}`,
+            id: `blog_${randomUUID()}`,
             message,
             linkString,
             dateString: payload.dateString ?? new Date().toISOString(),

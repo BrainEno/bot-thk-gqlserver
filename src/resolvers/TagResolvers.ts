@@ -1,3 +1,4 @@
+import { logFailure } from '../services/LogService'
 import { Arg, Authorized, Mutation, Query, Resolver } from 'type-graphql'
 import { Blog } from '../entities/blog'
 import { Tag } from '../entities/tag'
@@ -14,7 +15,7 @@ class TagResolvers {
             if (tags) return tags
             return []
         } catch (error) {
-            console.log(error)
+            logFailure('resolver.tag.operation.failed', error)
             return []
         }
     }
@@ -41,7 +42,7 @@ class TagResolvers {
             }
             return []
         } catch (error) {
-            console.log(error)
+            logFailure('resolver.tag.operation.failed', error)
             return []
         }
     }
@@ -57,7 +58,7 @@ class TagResolvers {
             })
             return !!newTag
         } catch (error) {
-            console.log(error)
+            logFailure('resolver.tag.operation.failed', error)
             return false
         }
     }
@@ -70,7 +71,7 @@ class TagResolvers {
             const res = await TagModel.findOneAndDelete({ _id: id })
             return !!res
         } catch (error) {
-            console.log(error)
+            logFailure('resolver.tag.operation.failed', error)
             return false
         }
     }
