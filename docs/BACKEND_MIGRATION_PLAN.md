@@ -1,8 +1,8 @@
 # BOT THK GraphQL 后端迁移路线图
 
-> 历史审查基线：`b8e75c6`。本文是迁移计划与早期审查记录，不是实时状态面板；当前实现状态以代码、CI 和活跃 issue 为准。
-> 范围：本次审阅了已跟踪的 TypeScript 源码、GraphQL SDL、依赖/锁文件、TypeScript/ESLint、Docker/Compose 配置，以及当前 GitHub 开放审计 issue。未改动业务实现。
-> 证据边界：仓库没有测试、没有 CI，也没有安装依赖目录；因此本次不能把静态判断冒称为完整的运行时验证。依赖候选版本仅通过 npm registry 查询，升级兼容性须由迁移 spike 和 CI 证明。
+> 历史审查基线：`b8e75c6`。本文是迁移计划和逐批验证记录，不是实时状态面板；当前实现状态以代码、CI 和活跃 issue 为准。
+> 范围：初始审查涵盖 TypeScript 源码、GraphQL SDL、依赖/锁文件、TypeScript/ESLint、Docker/Compose 配置与开放审计 issue；后续每批迁移在对应段落追加实际改动与验证证据。
+> 证据边界：依赖 metadata/audit 与本地 typecheck、lint、unit/runtime、build 各自证明的范围不同；未运行的 MongoDB/Docker/线上验证不会标记为通过。
 
 ## 1. 执行摘要
 
@@ -65,16 +65,18 @@
 
 截至 2026-11-25 的 npm registry 查询结果中，Apollo Server latest 为 5.5.2、Express 5.3.0、GraphQL 17.1.0、Mongoose 9.13.1、Typegoose 13.5.0、TypeScript 7.0.2、Puppeteer 25.18.1；TypeGraphQL latest tag 是 `2.0.0-rc.3`。这是 registry 的 latest 信息，不代表这些版本彼此兼容或适合当前 Node 22/24 运行环境。
 
-**当前依赖迁移状态（PR #61 已合并）：** Apollo Server 5 + Express 5、GraphQL 16.15、TypeGraphQL `2.0.0-rc.3`、TypeScript 6 和 Puppeteer 25 已纳入代码；用户明确接受 TypeGraphQL RC。GraphQL 17 与 GraphQL Scalars 2 不符合 Apollo Server 5 / TypeGraphQL RC3 的 peer dependency 范围。Mongoose 9.9.5 + Typegoose 13.5.0 曾进行 typecheck 探测，但现有 resolver/entity 在严格 ObjectId 查询、populate 投影及文档方法类型上产生数十个 TS 错误；因此目前保留 typecheck/build 通过的 Mongoose 8.24.11 + Typegoose 12.22.0 配对，而不是用宽泛 `any` 掩盖迁移问题。TypeScript 7 也暂缓：当前 `@typescript-eslint` 版本声明只支持 TypeScript `<6.1.0`。`@types/node` 保持与 CI/运行时 Node 22/24 对齐，不跟随 Node 26 最新类型版本。
+**当前依赖迁移状态（PR #61 已合并）：** Apollo Server 5 + Express 5、GraphQL 16.15、TypeGraphQL `2.0.0-rc.3`、TypeScript 6、Puppeteer 25，以及 Mongoose 9.13.1 + Typegoose 13.5.0 已纳入代码；用户明确接受 TypeGraphQL RC。Mongoose 9 / Typegoose 13 的迁移通过将实体 `_id` 类型改为 `Types.ObjectId`、将 populated refs 规范化到 ObjectId，并改用模型级更新解决了严格查询和文档方法类型问题，没有用宽泛 `any` 压制编译错误。Typegoose 13.5.0 声明的 Mongoose peer 仍是 `~9.9.5`；为包含 Mongoose 9.11.4 之后的安全修复，本项目固定在 9.13.1，并已通过 typecheck、lint、11 项 unit/runtime 测试（含 Apollo Server 对 TypeGraphQL schema 的 query 执行与日志敏感字段脱敏）、build 和 frozen-lockfile install，但仍需有真实 MongoDB 的集成验证。
 
-本轮增加 VS Code launch 配置与 `yarn debug`，便于本地断点调试；完整启动仍需要可用的 MongoDB 服务。
+GraphQL Scalars 2.0.1 是 TypeGraphQL RC3 声明的必需 peer；depcheck 因为本项目没有直接调用其导出而误报“未使用”，不能据此删除。2.0.1 是 PhoneNumber 标量 ReDoS advisory 的修复版本，但超出 TypeGraphQL `^1.25.0` peer 范围；保留修复版并记录该风险。为消除 GraphQL Tools mergeDeep 原型污染漏洞，本项目解析到 `@graphql-tools/utils` 12.1.0（Apollo Server 5.5.2 声明的上限为 `<12.0.2`），仍有 Yarn range warning；Apollo/TypeGraphQL schema execution smoke test 与项目测试通过。`nodemon` + 受漏洞影响的 `minimatch` 已移除，开发 watch 改用 Node 22 原生 `--watch`，避免不兼容 major resolution。临时以 npm overrides 模拟 Yarn resolution 对锁定依赖执行 npm audit，结果为 0 项；Yarn audit 命令仍因 TLS 断连不可用。GraphQL 17 仍不符合 Apollo Server 5 / TypeGraphQL RC3 的 peer 范围。TypeScript 7 暂缓：当前 `@typescript-eslint` 只声明支持 TypeScript `<6.1.0`。`@types/node` 保持与 CI/运行时 Node 22/24 对齐，不跟随 Node 26 类型版本。
+
+本轮把生产日志改为 stdout JSON、开发环境使用仅在 devDependency 中的 pino-pretty，加入 HTTP request ID 与 GraphQL operation latency/error-count 日志；移除解析器中的 console 调试输出、静态依赖图发现的未引用 schemas/error helper/interface/utility 文件及实体中未调用的 DB 查询方法（解除 entity→models 循环依赖；依赖图仍有 6 组实体/DTO 双向类型引用，字段类型使用懒解析并已通过 schema 构建测试，后续可随 DTO 分层评估拆分），避免遗留无效抽象和打印用户/关系标识。静态扫描确认 `class-transformer` 仅剩未实际执行的 `@Exclude` 注解、没有任何转换调用，因此一并移除依赖和无效注解；扫描也确认生产依赖无未引用项、无缺失依赖（graphql-scalars 保留为 TypeGraphQL 必需 peer）。`mongodb` 直接引用改为由项目直接依赖 Mongoose 暴露的 `Types.ObjectId`。本地断点调试入口仍为 `yarn debug` 与 VS Code launch；服务完整启动仍需要 MongoDB。
 
 | 当前项/风险 | 候选方向 | 决策门槛 |
 | --- | --- | --- |
 | Apollo Server 3（EOL）和 Express 4 | 已迁移到 Apollo Server 5 + Express 5 adapter（PR #61） | 保留 GraphQL 16 peer 范围；仍需在有 MongoDB 的环境验证完整 HTTP/SSE 启动与客户端契约 |
-| TypeGraphQL 1.1 + GraphQL 15 | 已迁移到 TypeGraphQL `2.0.0-rc.3` + GraphQL 16.15（用户接受该 RC） | 后续持续验证 resolver、订阅与客户端契约；不擅自升级到 peer 范围不兼容的 GraphQL 17 / GraphQL Scalars 2 |
+| TypeGraphQL 1.1 + GraphQL 15 | 已迁移到 TypeGraphQL `2.0.0-rc.3` + GraphQL 16.15 + GraphQL Scalars 2.0.1 | TypeGraphQL RC 与 Scalars 2 存在 peer-range mismatch；已通过 schema/build/unit 验证并用于安全修复，GraphQL 17 仍不兼容 |
 | Express 4 / TypeScript 4 / Node 18 镜像 | Express 5、TypeScript 6、Node 22/24 CI | TypeScript 7 等待 `@typescript-eslint` peer 兼容；验证目标 Node 矩阵与启动配置 |
-| Mongoose 8 + Typegoose 12 | 当前使用 Mongoose 8.24.11 + Typegoose 12.22.0；Mongoose 9 / Typegoose 13 探测未通过现有 strict typecheck | 保留当前无 `any` 泛化且 typecheck/build 通过的组合；按实体和 resolver 迁移查询/ObjectId/populate 类型后再升级，不以忽略错误作为完成标志 |
+| Mongoose 8 + Typegoose 12 | 已升级到 Mongoose 9.13.1 + Typegoose 13.5.0（Typegoose peer 元数据仍限 `~9.9.5`） | 用 9.13.1 纳入已修复的 Mongoose 安全公告；保持 ObjectId/ref 类型规范，后续补真实 MongoDB integration 覆盖 populate、transaction、index 和查询行为 |
 | `mongoose-autopopulate` | 显式 populate + request-scoped DataLoader | 先有查询基线；防止循环 populate、跨用户缓存和 N+1；建立列表分页/投影/索引 |
 | `shortid` | 首选 Node 内建 `crypto.randomUUID()`；若业务必须短 ID，再评估维护活跃且模块格式兼容的库 | 标识符是否安全敏感、数据库长度/索引、URL 和客户端兼容 |
 | HMAC-SHA1 密码存储；`bcrypt` 已安装但未使用 | 首选 Argon2id；在原生依赖和部署支持不合适时基准 bcrypt | 渐进 rehash：旧格式只作登录校验，通过后立即升级；禁止明文导出/批量解密 |

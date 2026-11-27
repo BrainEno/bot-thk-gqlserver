@@ -1,4 +1,5 @@
 import { AuthenticationError } from '../errors/graphqlErrors';
+import { logFailure } from '../services/LogService';
 import {
   Resolver,
   Query,
@@ -58,7 +59,8 @@ export default class MessageResolvers {
         .exec();
 
       return messages;
-    } catch {
+    } catch (error) {
+      logFailure('message.list.failed', error)
       throw new GraphQLError("Unable to load messages");
     }
   }
@@ -188,7 +190,8 @@ export default class MessageResolvers {
       });
 
       return true;
-    } catch {
+    } catch (error) {
+      logFailure('message.send.failed', error)
       throw new GraphQLError("Error sending message");
     }
   }

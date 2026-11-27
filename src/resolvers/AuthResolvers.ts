@@ -1,7 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { ApolloError, AuthenticationError } from '../errors/graphqlErrors'
 import { isEmail, isEmpty } from 'class-validator'
-import dotenv from 'dotenv'
 import jwt from 'jsonwebtoken'
 import {
     Arg,
@@ -25,8 +24,7 @@ import { isAdmin } from '../middlewares/authChecker'
 import { LoginResponse } from '../dtos/loginResponse'
 import { User } from '../entities/user'
 import { setPassword, verifyPassword } from '../services/passwordService'
-
-dotenv.config({ quiet: true })
+import { logFailure } from '../services/LogService'
 
 export class EmailError extends ApolloError {
     constructor(message: string) {
@@ -155,7 +153,8 @@ class AuthResolvers {
                 refreshToken: newRefreshToken,
                 ok: true,
             }
-        } catch {
+        } catch (error) {
+            logFailure('auth.refresh.failed', error)
             return invalidResponse
         }
     }
@@ -176,7 +175,8 @@ class AuthResolvers {
                 return curUser
             }
             return null
-        } catch {
+        } catch (error) {
+            logFailure('auth.current_user.failed', error)
             throw new AuthenticationError('Unable to load the current user')
         }
     }
@@ -214,8 +214,9 @@ class AuthResolvers {
 
             sgMail.setApiKey(apiKey)
             await sgMail.send(genEmailData(normalizedEmail, token))
-        } catch {
+        } catch (error) {
             // Do not reveal whether the account exists or expose reset credentials.
+            logFailure('auth.password_reset_email.failed', error)
         }
 
         return response
@@ -256,7 +257,8 @@ class AuthResolvers {
                 secure: true,
             })
             return true
-        } catch {
+        } catch (error) {
+            logFailure('auth.password_reset.failed', error)
             return false
         }
     }

@@ -1,4 +1,6 @@
+import 'dotenv/config'
 import 'reflect-metadata'
+import { randomUUID } from 'node:crypto'
 
 import { ApolloServer, type ApolloServerPlugin } from '@apollo/server'
 import { ApolloServerPluginLandingPageDisabled } from '@apollo/server/plugin/disabled'
@@ -10,7 +12,6 @@ import { createHandler } from 'graphql-sse/lib/use/express'
 import { GraphQLError } from 'graphql'
 import cookieParser from 'cookie-parser'
 import cors from 'cors'
-import dotenv from 'dotenv'
 import express from 'express'
 import http from 'http'
 import mongoose from 'mongoose'
@@ -22,12 +23,9 @@ import {
 import { ArgumentValidationError } from 'type-graphql'
 
 import { context, getDynamicContext } from './context/typeGraphQLContext'
-import { LogService } from './services/LogService'
+import { LogService, logFailure, requestContext } from './services/LogService'
 import { TContext } from './types'
 import { createSchema } from './utils/createSchema'
-
-// Load local development configuration without logging its values.
-dotenv.config({ quiet: true })
 
 const corsOptions = {
     origin: [
@@ -36,6 +34,7 @@ const corsOptions = {
         'https://sendgrid.com',
     ],
     credentials: true,
+    exposedHeaders: ['x-request-id'],
 }
 
 const MONGODB_URI = process.env.MONGODB_URI ?? 'mongodb://127.0.0.1:27017/bot-thk'
@@ -65,14 +64,20 @@ const main = async () => {
     })
     const app = express()
 
+    app.use((_req, res, next) => {
+        const requestId = randomUUID()
+        res.locals.requestId = requestId
+        res.setHeader('x-request-id', requestId)
+        requestContext.run({ requestId }, next)
+    })
     app.use(cookieParser())
     app.use(express.json())
     app.use(cors(corsOptions))
     app.use('/graphql/stream', async (req, res) => {
         try {
             await handler(req, res)
-        } catch {
-            logger.error('GraphQL SSE handler failed')
+        } catch (error) {
+            logFailure('graphql.sse.handler.failed', error)
             if (!res.headersSent) res.status(500).end()
         }
     })
@@ -95,12 +100,25 @@ const main = async () => {
     const httpServer = http.createServer(app)
 
     await mongoose.connect(MONGODB_URI, { serverSelectionTimeoutMS: 5_000 })
-    logger.log('MongoDB connected')
+    logger.log('mongodb.connected')
 
     const complexityPlugin: ApolloServerPlugin<TContext> = {
-        async requestDidStart() {
+        async requestDidStart({ request }) {
+            const startedAt = performance.now()
+            const operationName = request.operationName?.slice(0, 100) ?? 'anonymous'
             return {
-                async didResolveOperation({ request, document }) {
+                async willSendResponse({ response, contextValue }) {
+                    const errorCount = response.body.kind === 'single'
+                        ? response.body.singleResult.errors?.length ?? 0
+                        : 0
+                    logger.log('graphql.operation.completed', {
+                        operationName,
+                        requestId: contextValue.requestId,
+                        durationMs: Math.round(performance.now() - startedAt),
+                        errorCount,
+                    })
+                },
+                async didResolveOperation({ request, document, contextValue }) {
                     const complexity = getComplexity({
                         schema,
                         operationName: request.operationName,
@@ -117,7 +135,11 @@ const main = async () => {
                         })
                     }
                     if (complexity > 0) {
-                        logger.log(`Used query complexity points: ${complexity}`)
+                        logger.log('graphql.query.complexity', {
+                            complexity,
+                            requestId: contextValue.requestId,
+                            operationName,
+                        })
                     }
                 },
             }
@@ -128,11 +150,11 @@ const main = async () => {
         schema,
         formatError: (error) => {
             if (error instanceof ArgumentValidationError) {
-                logger.warn('GraphQL argument validation failed')
+                logger.warn('graphql.argument_validation_failed')
                 return error
             }
             if (error.extensions?.code === 'INTERNAL_SERVER_ERROR') {
-                logger.error('GraphQL request failed')
+                logger.error('graphql.request.failed', { code: error.extensions?.code })
                 return {
                     message: 'Internal server error',
                     locations: error.locations,
@@ -173,7 +195,7 @@ const main = async () => {
         })
     })
 
-    logger.log(`Apollo server ready on port ${port}`)
+    logger.log('http.server.ready', { port })
 
     let shuttingDown = false
     const shutdown = async () => {
@@ -182,9 +204,9 @@ const main = async () => {
         try {
             await apolloServer.stop()
             await mongoose.disconnect()
-            logger.log('Server shutdown complete')
-        } catch {
-            logger.error('Server shutdown failed')
+            logger.log('server.shutdown.completed')
+        } catch (error) {
+            logFailure('server.shutdown.failed', error)
             process.exitCode = 1
         }
     }
@@ -194,7 +216,6 @@ const main = async () => {
 }
 
 main().catch((error: unknown) => {
-    const errorName = error instanceof Error ? error.name : 'UnknownError'
-    console.error(`Server startup failed (${errorName})`)
+    logFailure('server.startup.failed', error)
     process.exitCode = 1
 })

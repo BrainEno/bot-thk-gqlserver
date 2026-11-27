@@ -32,7 +32,7 @@ docker compose up -d mongo
 yarn dev
 ```
 
-The API listens on `http://127.0.0.1:4001`; check `/healthz` for process liveness and `/readyz` for MongoDB readiness. `yarn dev` restarts the server when TypeScript source changes. For a debugger session, open **Run and Debug** in VS Code and select **Debug BOT THK GraphQL API** (F5); it loads `.env`, stops at startup, and maps breakpoints to TypeScript source. Alternatively, run `yarn debug` to start with the Node inspector on loopback port `9229`, then attach your debugger there. Do not expose the inspector port on a public interface.
+The API listens on `http://127.0.0.1:4001`; check `/healthz` for process liveness and `/readyz` for MongoDB readiness. `yarn dev` uses Node 22's built-in `--watch` mode to restart on imported TypeScript changes; no third-party watcher is needed. For a debugger session, open **Run and Debug** in VS Code and select **Debug BOT THK GraphQL API** (F5); it loads `.env`, stops at startup, and maps breakpoints to TypeScript source. Alternatively, run `yarn debug` to start with the Node inspector on loopback port `9229`, then attach your debugger there. Do not expose the inspector port on a public interface.
 
 For the fully containerized setup, `.env` is required by the server service:
 
@@ -42,7 +42,7 @@ docker compose up --build
 
 The API listens on port `4001`. Compose binds it to `127.0.0.1` on the host. MongoDB is published only on host loopback at `127.0.0.1:27017` for local development (no authentication is configured); do not change this to a public interface or use this setup in production. The `mongo_data` volume survives `docker compose down`; `docker compose down -v` deletes it and all local Mongo data.
 
-Health endpoints are `/healthz` (process liveness) and `/readyz` (MongoDB readiness); GraphQL HTTP is at `/graphql` and SSE is at `/graphql/stream`.
+Health endpoints are `/healthz` (process liveness) and `/readyz` (MongoDB readiness); GraphQL HTTP is at `/graphql` and SSE is at `/graphql/stream`. Every HTTP response includes an `x-request-id`; Request-scoped logs (including resolver failures) and GraphQL operation logs include that ID; operation logs also include a bounded operation name, duration, query-complexity score, and error count, but never query variables, credentials, or request bodies. Production emits structured JSON logs to stdout; local development uses human-readable Pino output.
 
 For a local server outside Compose, set `MONGODB_URI` to a reachable MongoDB instance, along with independent `ACCESS_TOKEN_SECRET`, `REFRESH_TOKEN_SECRET`, and `JWT_RESET_PASSWORD` values. SendGrid and Cloudinary credentials are optional unless those integrations are used. Never commit `.env` or use the example secrets in a deployed environment.
 

@@ -17,6 +17,12 @@ test('public profile schema omits private email and relationship fields', () => 
         'photo',
         'username',
     ])
+
+    const userType = schema.getType('User')
+    assert.ok(userType && 'getFields' in userType)
+    const internalUserFields = userType.getFields()
+    assert.equal(internalUserFields.salt, undefined)
+    assert.equal(internalUserFields.hashed_password, undefined)
 })
 
 test('password reset contract requires a token, not an account identifier', () => {

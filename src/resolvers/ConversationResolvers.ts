@@ -1,4 +1,5 @@
 import { AuthenticationError } from '../errors/graphqlErrors';
+import { logFailure } from '../services/LogService';
 import {
   Arg,
   Ctx,
@@ -24,15 +25,12 @@ import {
   ConversationPopulated,
 } from "../interfaces/conversation.interface";
 import { Conversation } from "../entities/conversation";
-import dotenv from "dotenv";
 import mongoose, { Types } from "mongoose";
 import {
   ConversationUpdated,
   PopulatedConversation,
   PopulatedUser,
 } from "../dtos/conversations";
-
-dotenv.config({ quiet: true });
 
 @Resolver()
 export default class ConversationResolvers {
@@ -86,10 +84,10 @@ export default class ConversationResolvers {
         .select("participants messages latestMessage createdAt updatedAt")
         .exec();
 
-      // console.log('result res', conversations);
 
       return conversations;
-    } catch {
+    } catch (error) {
+      logFailure('conversation.list.failed', error)
       throw new GraphQLError("Unable to load conversations");
     }
   }
@@ -172,7 +170,6 @@ export default class ConversationResolvers {
 
       const conversationData = conversation.toObject();
 
-      // console.log(conversationData);
 
       await Promise.all(
         participants.map(async (p) => {
@@ -189,7 +186,8 @@ export default class ConversationResolvers {
       });
 
       return conversation._id.toString();
-    } catch {
+    } catch (error) {
+      logFailure('conversation.create.failed', error)
       throw new GraphQLError("Error creating conversation");
     }
   }
@@ -279,7 +277,8 @@ export default class ConversationResolvers {
         conversationDeleted,
       });
       return true;
-    } catch {
+    } catch (error) {
+      logFailure('conversation.delete.failed', error)
       throw new GraphQLError("Unable to delete conversation");
     }
   }
@@ -304,13 +303,11 @@ export default class ConversationResolvers {
         (id) => !participantIds.includes(id)
       );
 
-      // console.log('to delete participant:', participantsToDelete);
 
       const participantsToCreate = participantIds.filter(
         (id) => !existingParticipants.includes(id)
       );
 
-      // console.log('to create participant:', participantsToCreate);
 
       const toUpdate = (await ConversationModel.findOne({
         _id: conversationId,
@@ -492,7 +489,8 @@ export default class ConversationResolvers {
       };
       await publishEvent(Topic.ConversationUpdated, payload);
       return true;
-    } catch {
+    } catch (error) {
+      logFailure('conversation.participants.update.failed', error)
       throw new GraphQLError("Unable to update conversation participants");
     }
   }
@@ -550,12 +548,9 @@ export default class ConversationResolvers {
         (id: string) => id === context?.user?._id.toString()
       );
 
-      const latestMessage = MessageModel.findOne({
-        _id: payload.conversationUpdated.conversation.latestMessage,
-      });
-
-      const userSentLastestMessage =
-        latestMessage?.senderId === context.user._id;
+      const userSentLatestMessage =
+        payload.conversationUpdated.conversation.latestMessage?.senderId ===
+        context.user._id.toString();
 
       const userIsBeingRemoved =
         removedUserIds &&
@@ -566,8 +561,8 @@ export default class ConversationResolvers {
         );
 
       return Boolean(
-        (userIsParticipant && !userSentLastestMessage) ||
-          userSentLastestMessage ||
+        (userIsParticipant && !userSentLatestMessage) ||
+          userSentLatestMessage ||
           userIsBeingRemoved
       );
     },

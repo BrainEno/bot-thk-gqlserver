@@ -7,7 +7,7 @@ import AuthResolvers from '../resolvers/AuthResolvers'
 import BlogResolvers from '../resolvers/BlogResolvers'
 import CatResolvers from '../resolvers/CatResolvers'
 import UserResolvers from '../resolvers/UserResolvers'
-import { ObjectId } from 'mongodb'
+import { Types } from 'mongoose'
 import { ObjectIdScalar } from './ObjectIdScalar'
 import TagResolvers from '../resolvers/TagResolvers'
 import ConversationResolvers from '../resolvers/ConversationResolvers'
@@ -39,5 +39,5 @@ export const createSchema = () =>
                       sortedSchema: false,
                   }
                 : false,
-        scalarsMap: [{ type: ObjectId, scalar: ObjectIdScalar }],
+        scalarsMap: [{ type: Types.ObjectId, scalar: ObjectIdScalar }],
     })

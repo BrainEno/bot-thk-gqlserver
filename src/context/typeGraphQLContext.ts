@@ -12,6 +12,7 @@ export const context = async ({ req, res }: { req: Request; res: Response }): Pr
     return {
         req,
         res,
+        requestId: String(res.locals.requestId ?? 'unknown'),
         user: verifyAccessToken(req.headers.authorization),
     }
 }

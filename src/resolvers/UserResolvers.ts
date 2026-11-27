@@ -1,3 +1,4 @@
+import { logFailure } from '../services/LogService'
 import { randomUUID } from 'node:crypto'
 import {
   Arg,
@@ -20,6 +21,7 @@ import { NewFollowerPayload } from '../interfaces/notification.interface';
 import { Notification } from '../dtos/notification';
 import { FollowInfo } from '../dtos/followInfo';
 import { UserInfoResponse } from '../dtos/userInfoResponse';
+import { toObjectId } from '../utils/toObjectId';
 
 @Resolver()
 class UserResolvers {
@@ -40,7 +42,7 @@ class UserResolvers {
         createdAt: user.createdAt,
       };
     } catch (error) {
-      console.log(error);
+      logFailure('resolver.user.operation.failed', error)
       throw error;
     }
   }
@@ -78,13 +80,13 @@ class UserResolvers {
 
     if (toSearch) {
       const followings = await UserModel.find({
-        _id: { $in: toSearch.followings },
+        _id: { $in: (toSearch.followings ?? []).map((ref) => toObjectId(ref)) },
       })
         .select('_id username name about photo createdAt')
         .exec()
 
       const followers = await UserModel.find({
-        _id: { $in: toSearch.followers },
+        _id: { $in: (toSearch.followers ?? []).map((ref) => toObjectId(ref)) },
       })
         .select('_id username name about photo createdAt')
         .exec()
@@ -156,7 +158,7 @@ class UserResolvers {
         throw Error('already followed this user');
       }
     } catch (err) {
-      console.log(err);
+      logFailure('resolver.user.operation.failed', err)
       throw err;
     }
   }
@@ -209,7 +211,7 @@ class UserResolvers {
         throw Error(`haven't followed this user yet`);
       }
     } catch (err) {
-      console.log(err);
+      logFailure('resolver.user.operation.failed', err)
       throw err;
     }
   }
@@ -244,7 +246,7 @@ class UserResolvers {
       }
       return true;
     } catch (error) {
-      console.log(error);
+      logFailure('resolver.user.operation.failed', error)
       return false;
     }
   }
@@ -262,7 +264,8 @@ class UserResolvers {
     @Root() payload: NewFollowerPayload,
     @Arg('name') name: string
   ): Notification {
-    console.log('arg name: ', name);
+    // Keep the legacy subscription argument in the schema contract.
+    void name
 
     return {
       id: `user_${randomUUID()}`,

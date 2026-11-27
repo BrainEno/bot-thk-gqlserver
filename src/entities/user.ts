@@ -5,13 +5,12 @@ import {
     Ref,
     Severity,
 } from '@typegoose/typegoose'
-import { Exclude } from 'class-transformer'
 import { IsEmail, Length, MaxLength, MinLength } from 'class-validator'
 import { setPassword as hashAndSetPassword } from '../services/passwordService'
 import { ObjectIdScalar as ObjectId } from '../utils/ObjectIdScalar'
 import { Field, ObjectType } from 'type-graphql'
 import { Comment } from './comment'
-import { ObjectId as ObjectID } from 'mongoose'
+import { Types } from 'mongoose'
 import { TimeStamps } from '@typegoose/typegoose/lib/defaultClasses'
 import { Blog } from './blog'
 
@@ -22,7 +21,7 @@ import { Blog } from './blog'
 })
 export class User extends TimeStamps {
     @Field(() => ObjectId)
-    readonly _id: ObjectID
+    readonly _id: Types.ObjectId
 
     @prop({
         type: () => String,
@@ -64,7 +63,6 @@ export class User extends TimeStamps {
     hashed_password: string
 
     @prop({ type: () => String })
-    @Exclude()
     salt: string
 
     @prop({ type: () => String, nullable: true })

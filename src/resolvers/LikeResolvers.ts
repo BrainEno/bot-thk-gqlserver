@@ -27,7 +27,6 @@ export default class LikeResolvers {
                 ? existingLikers.map((l) => l._id)
                 : []
 
-            console.log('existingLikerIds before:', existingLikerIds)
             const blogBeliked = existingLikerIds
                 .map((i) => i.toString())
                 .includes(user._id.toString())
@@ -51,7 +50,6 @@ export default class LikeResolvers {
                   ) as unknown as Types.ObjectId[])
                 : ([] as Types.ObjectId[])
 
-            console.log('likedBlogIds before:', likedBlogIds)
 
             const likedBlog =
                 likedBlogIds &&
@@ -67,8 +65,6 @@ export default class LikeResolvers {
 
             if (!liker) return false
 
-            console.log('existingLikerIds after:', existingLikerIds)
-            console.log('likedBlogIds after:', likedBlogIds)
             await blog.updateOne({
                 likedBy: existingLikerIds,
             })

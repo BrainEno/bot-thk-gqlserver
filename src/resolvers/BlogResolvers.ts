@@ -1,3 +1,4 @@
+import { logFailure } from '../services/LogService'
 import { randomUUID } from 'node:crypto'
 import {
     Arg,
@@ -47,7 +48,7 @@ class BlogResolvers {
                 .exec()
             return blogs as unknown as PopulatedCardBlog[]
         } catch (error) {
-            console.log(error)
+            logFailure('resolver.blog.operation.failed', error)
             return []
         }
     }
@@ -77,7 +78,7 @@ class BlogResolvers {
             if (!blog) throw new Error(`not found blog with slug ${slug}`)
             return blog
         } catch (err) {
-            console.log(err)
+            logFailure('resolver.blog.operation.failed', err)
             throw err
         }
     }
@@ -106,7 +107,7 @@ class BlogResolvers {
             if (!blog) throw new Error(`not found blog with id ${blogId}`)
             return blog as unknown as PopulatedBlog
         } catch (err) {
-            console.log(err)
+            logFailure('resolver.blog.operation.failed', err)
             throw err
         }
     }
@@ -178,7 +179,7 @@ class BlogResolvers {
                 throw new Error(`not found blogs related with slug ${slug}`)
             return blogs as unknown as PopulatedCardBlog[]
         } catch (err) {
-            console.log(err)
+            logFailure('resolver.blog.operation.failed', err)
             throw err
         }
     }
@@ -220,7 +221,7 @@ class BlogResolvers {
                 throw new Error(`not found blogs belongs to user: ${userId}`)
             return blogs
         } catch (err) {
-            console.log(err)
+            logFailure('resolver.blog.operation.failed', err)
             throw err
         }
     }
@@ -262,7 +263,7 @@ class BlogResolvers {
             if (!blogs) throw new Error(`not found blogs liked by user: ${id}`)
             return blogs
         } catch (err) {
-            console.log(err)
+            logFailure('resolver.blog.operation.failed', err)
             throw err
         }
     }
@@ -334,7 +335,7 @@ class BlogResolvers {
 
             return { success: true, blog }
         } catch (error) {
-            console.log(error)
+            logFailure('resolver.blog.operation.failed', error)
             return { success: false, blog: null }
         }
     }
@@ -395,7 +396,7 @@ class BlogResolvers {
 
             return { success: true, blog: newBlog }
         } catch (error) {
-            console.log(error)
+            logFailure('resolver.blog.operation.failed', error)
             return { success: false, blog: null }
         }
     }
@@ -427,7 +428,8 @@ class BlogResolvers {
         @Root() payload: NewBlogPayload,
         @Arg('followingIds', () => [String]) followingIds: string[]
     ): Notification {
-        console.log('arg followingIds', followingIds)
+        // Keep the legacy subscription argument in the schema contract.
+        void followingIds
 
         const message = `${payload.authorName}__${payload.blogTitle}`
         const linkString = `${payload.authorUsername}__${payload.blogSlug}`
