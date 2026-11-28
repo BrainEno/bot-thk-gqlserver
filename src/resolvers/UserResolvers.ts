@@ -1,12 +1,12 @@
+import { logFailure } from '../services/LogService'
+import { randomUUID } from 'node:crypto'
 import {
   Arg,
+  Authorized,
   Ctx,
   Mutation,
-  Publisher,
-  PubSub,
   Query,
   Resolver,
-  ResolverFilterData,
   Root,
   Subscription,
 } from 'type-graphql';
@@ -14,14 +14,17 @@ import {
 import { User } from '../entities/user';
 import { TContext } from '../types';
 import { UserModel } from '../models';
-import { AuthenticationError } from 'apollo-server-express';
+import { AuthenticationError } from '../errors/graphqlErrors';
 import { isEmail, isEmpty } from 'class-validator';
-import { Topic } from '../topic';
+import { publishEvent, Topic } from '../topic';
 import { NewFollowerPayload } from '../interfaces/notification.interface';
-import shortid from 'shortid';
+
 import { Notification } from '../dtos/notification';
 import { FollowInfo } from '../dtos/followInfo';
 import { UserInfoResponse } from '../dtos/userInfoResponse';
+import { toObjectId } from '../utils/toObjectId'
+import { isRecipient } from '../services/subscriptionAccess';
+import { areUserIdsEqual } from '../services/userIdentity';
 
 @Resolver()
 class UserResolvers {
@@ -37,33 +40,34 @@ class UserResolvers {
         _id:user._id.toString(),
         username: user.username,
         name: user.name,
-        email: user.email,
         about: user.about || '',
         photo: user.photo,
         createdAt: user.createdAt,
       };
     } catch (error) {
-      console.log(error);
+      logFailure('resolver.user.operation.failed', error)
       throw error;
     }
   }
 
-  @Query(() => [User], { nullable: true })
-  async searchUsers(@Arg('name') name: string) {
-    try {
-      const users = await UserModel.find({
-        name: { $regex: name, $options: 'i' },
-      })
-        .select(
-          '_id username name email profile about photo followingIds followerIds'
-        )
-        .exec();
+  @Query(() => [UserInfoResponse])
+  async searchUsers(@Arg('name') name: string): Promise<UserInfoResponse[]> {
+    const searchTerm = name.trim().slice(0, 64)
+    if (!searchTerm) return []
 
-      if (!users) return [];
-      return users;
-    } catch (err) {
-      throw err;
-    }
+    const escapedTerm = [...searchTerm]
+      .map((character) =>
+        '.*+?^${}()|[]\\'.includes(character) ? `\\${character}` : character
+      )
+      .join('')
+    const users = await UserModel.find({
+      name: { $regex: escapedTerm, $options: 'i' },
+    })
+      .select('_id username name about photo createdAt')
+      .limit(20)
+      .exec()
+
+    return users.map(toUserInfoResponse)
   }
 
   @Query(() => FollowInfo, { nullable: true })
@@ -71,37 +75,29 @@ class UserResolvers {
     @Ctx() { user }: TContext,
     @Arg('username', { nullable: true }) username?: string
   ) {
-    let toSearch: any;
-    if (username) toSearch = await UserModel.findOne({ username });
-    if (!username && user)
-      toSearch = await UserModel.findOne({ _id: user._id });
+    let toSearch: User | null = null
+    if (username) toSearch = await UserModel.findOne({ username })
+    if (!username && user) {
+      toSearch = await UserModel.findOne({ _id: user._id })
+    }
 
-    try {
-      if (toSearch) {
-        const followings = await UserModel.find({
-          _id: {
-            $in: toSearch.followings,
-          },
-        })
-          .select(
-            '_id username name email profile about photo followingIds followerIds'
-          )
-          .exec();
+    if (toSearch) {
+      const followings = await UserModel.find({
+        _id: { $in: (toSearch.followings ?? []).map((ref) => toObjectId(ref)) },
+      })
+        .select('_id username name about photo createdAt')
+        .exec()
 
-        const followers = await UserModel.find({
-          _id: {
-            $in: toSearch.followers,
-          },
-        })
-          .select(
-            '_id username name email profile about photo followingIds followerIds'
-          )
-          .exec();
+      const followers = await UserModel.find({
+        _id: { $in: (toSearch.followers ?? []).map((ref) => toObjectId(ref)) },
+      })
+        .select('_id username name about photo createdAt')
+        .exec()
 
-        return { followers, followings };
+      return {
+        followers: followers.map(toUserInfoResponse),
+        followings: followings.map(toUserInfoResponse),
       }
-    } catch (err) {
-      throw err;
     }
     return {
       followers: [],
@@ -112,9 +108,7 @@ class UserResolvers {
   @Mutation(() => Boolean)
   async follow(
     @Ctx() { user }: TContext,
-    @Arg('followName') followName: string,
-    @PubSub(Topic.NewNotification)
-    notifyAboutNewFollower: Publisher<NewFollowerPayload>
+    @Arg('followName') followName: string
   ) {
     if (isEmpty(followName)) throw new Error('该用户不存在');
     try {
@@ -125,7 +119,7 @@ class UserResolvers {
       const toFollow = await UserModel.findOne({ name: followName });
 
       if (!toFollow) throw new Error('该用户不存在或已注销');
-      if (user._id === toFollow._id)
+      if (areUserIdsEqual(user._id, toFollow._id))
         throw new Error('不能关注自己');
 
       if (!curUser.followings) curUser.followings = [];
@@ -154,10 +148,11 @@ class UserResolvers {
           dateString: new Date().toISOString(),
           followerName: curUser.name,
           followedName: toFollow.name,
+          followedUserId: toFollow._id.toString(),
           followerUsername: curUser.username,
         };
 
-        await notifyAboutNewFollower(payload);
+        await publishEvent(Topic.NewNotification, payload);
 
         await curUser.save();
         await toFollow.save();
@@ -167,7 +162,7 @@ class UserResolvers {
         throw Error('already followed this user');
       }
     } catch (err) {
-      console.log(err);
+      logFailure('resolver.user.operation.failed', err)
       throw err;
     }
   }
@@ -220,7 +215,7 @@ class UserResolvers {
         throw Error(`haven't followed this user yet`);
       }
     } catch (err) {
-      console.log(err);
+      logFailure('resolver.user.operation.failed', err)
       throw err;
     }
   }
@@ -255,33 +250,41 @@ class UserResolvers {
       }
       return true;
     } catch (error) {
-      console.log(error);
+      logFailure('resolver.user.operation.failed', error)
       return false;
     }
   }
 
+  @Authorized()
   @Subscription(() => Notification, {
     topics: Topic.NewNotification,
-    filter: ({
-      payload,
-      args,
-    }: ResolverFilterData<NewFollowerPayload, { name: string }>) => {
-      return payload.followedName === args.name;
-    },
+    filter: ({ payload, context }) =>
+      'followedUserId' in payload &&
+      isRecipient([payload.followedUserId], context),
   })
   userFollowed(
     @Root() payload: NewFollowerPayload,
     @Arg('name') name: string
   ): Notification {
-    console.log('arg name: ', name);
+    // Keep the legacy subscription argument in the schema contract.
+    void name
 
     return {
-      id: `user_${shortid.generate()}`,
+      id: `user_${randomUUID()}`,
       message: payload.followerName,
       dateString: payload.dateString ?? new Date().toISOString(),
       linkString: payload.followerUsername,
     };
   }
 }
+
+const toUserInfoResponse = (user: User): UserInfoResponse => ({
+  _id: user._id.toString(),
+  username: user.username,
+  name: user.name,
+  about: user.about || '',
+  photo: user.photo,
+  createdAt: user.createdAt,
+})
 
 export default UserResolvers;

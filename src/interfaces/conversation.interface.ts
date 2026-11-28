@@ -33,6 +33,8 @@ export interface ConversationUpdatedPayload {
         addedUserIds?: string[]
         removedUserIds?: string[]
     }
+    /** Server-derived audience for authorization; not part of the GraphQL result. */
+    recipientUserIds: string[]
 }
 
 export interface ConversationCreatedPayload {

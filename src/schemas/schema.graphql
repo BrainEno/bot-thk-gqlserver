@@ -15,7 +15,7 @@ type Query {
   listCats: [Category!]!
   getCatBlogs(slug: String!): [Blog!]!
   getUserInfo(username: String!): UserInfoResponse!
-  searchUsers(name: String!): [User!]
+  searchUsers(name: String!): [UserInfoResponse!]!
   getFollowInfo(username: String): FollowInfo
   listTags: [Tag!]!
   getTagBlogs(slug: String!): [Blog!]!
@@ -32,16 +32,15 @@ type User {
   profile: String!
   about: String
   role: String!
-  photo: String
-  resetPasswordLink: String
+  photo: String!
   commented: [Comment!]!
   likedBlogs: [Blog!]!
   followings: [User!]!
   followers: [User!]!
   followingIds: [String!]!
   followerIds: [String!]!
-  createdAt: DateTime!
-  updatedAt: DateTime
+  createdAt: DateTimeISO!
+  updatedAt: DateTimeISO
 }
 
 """Mongo object id scalar type"""
@@ -54,8 +53,8 @@ type Comment {
   atBlog: Blog
   replyTo: Comment
   replies: [Comment!]!
-  createdAt: DateTime!
-  updatedAt: DateTime
+  createdAt: DateTimeISO!
+  updatedAt: DateTimeISO
 }
 
 type Blog {
@@ -65,15 +64,15 @@ type Blog {
   description: String!
   body: String!
   mtitle: String!
-  imageUri: String
-  active: Boolean
-  likedBy: [User!]
-  comments: [Comment!]
+  imageUri: String!
+  active: Boolean!
+  likedBy: [User!]!
+  comments: [Comment!]!
   categories: [Category!]!
   tags: [Tag!]!
   author: User!
-  createdAt: DateTime!
-  updatedAt: DateTime!
+  createdAt: DateTimeISO!
+  updatedAt: DateTimeISO!
 }
 
 type Category {
@@ -89,19 +88,19 @@ type Tag {
 }
 
 """
-The javascript `Date` as string. Type represents date and time as the ISO Date string.
+A date-time string at UTC, such as 2007-12-03T10:15:30Z, compliant with the `date-time` format outlined in section 5.6 of the RFC 3339 profile of the ISO 8601 standard for representation of dates and times using the Gregorian calendar.This scalar is serialized to a string in ISO 8601 format and parsed from a string in ISO 8601 format.
 """
-scalar DateTime
+scalar DateTimeISO
 
 type PopulatedCardBlog {
   _id: String!
   title: String!
   slug: String!
-  imageUri: String
+  imageUri: String!
   author: PopulatedUser!
   tags: [PopulatedTag!]!
   description: String!
-  createdAt: DateTime!
+  createdAt: DateTimeISO!
 }
 
 type PopulatedUser {
@@ -125,15 +124,15 @@ type PopulatedBlog {
   description: String!
   body: String!
   mtitle: String!
-  imageUri: String
-  active: Boolean
-  likedBy: [PopulatedUser!]
-  comments: [PopulatedComment!]
-  categories: [PopulatedCategory!]
-  tags: [PopulatedTag!]
+  imageUri: String!
+  active: Boolean!
+  likedBy: [PopulatedUser!]!
+  comments: [PopulatedComment!]!
+  categories: [PopulatedCategory!]!
+  tags: [PopulatedTag!]!
   author: PopulatedUser!
-  createdAt: DateTime!
-  updatedAt: DateTime!
+  createdAt: DateTimeISO!
+  updatedAt: DateTimeISO!
 }
 
 type PopulatedComment {
@@ -153,15 +152,14 @@ type UserInfoResponse {
   _id: String!
   username: String!
   name: String!
-  email: String!
   about: String!
   photo: String!
-  createdAt: DateTime!
+  createdAt: DateTimeISO!
 }
 
 type FollowInfo {
-  followers: [User!]!
-  followings: [User!]!
+  followers: [UserInfoResponse!]!
+  followings: [UserInfoResponse!]!
 }
 
 type Conversation {
@@ -170,9 +168,9 @@ type Conversation {
   participantUserIds: [String!]!
   messages: [Message!]!
   latestMessage: Message
-  latestMessageId: String
-  createdAt: DateTime
-  updatedAt: DateTime!
+  latestMessageId: String!
+  createdAt: DateTimeISO!
+  updatedAt: DateTimeISO!
 }
 
 type Participant {
@@ -189,8 +187,8 @@ type Message {
   body: String!
   sender: User!
   senderId: String!
-  createdAt: DateTime!
-  updatedAt: DateTime!
+  createdAt: DateTimeISO!
+  updatedAt: DateTimeISO!
 }
 
 type Mutation {
@@ -199,7 +197,7 @@ type Mutation {
   refreshToken(refreshToken: String!): LoginResponse!
   logout: Boolean!
   forgotPassword(email: String!): String!
-  resetPassword(password: String!, username: String!): Boolean!
+  resetPassword(password: String!, token: String!): Boolean!
   revokeRefreshTokensForUser(userId: String!): Boolean!
   createBlog(tagIds: [String!], blogInput: BlogInput!): NewBlogResponse!
   updateBlog(tagIds: [String!], blogInput: BlogInput!, blogId: String!): NewBlogResponse!
@@ -247,6 +245,7 @@ type Subscription {
   conversationCreated: PopulatedConversation!
   conversationUpdated: ConversationUpdated!
   conversationDeleted: PopulatedConversation!
+  conversationRemoved: String!
   messageSent: Message!
 }
 

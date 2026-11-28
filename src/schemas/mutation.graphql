@@ -55,8 +55,8 @@ mutation EditProfile(
     editProfile(about: $about, name: $name, photo: $photo, email: $email)
 }
 
-mutation ResetPassword($password: String!, $username: String!) {
-    resetPassword(password: $password, username: $username)
+mutation ResetPassword($password: String!, $token: String!) {
+    resetPassword(password: $password, token: $token)
 }
 
 mutation ForgotPassword($email: String!) {

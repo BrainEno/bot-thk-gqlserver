@@ -1,11 +1,11 @@
 import { Field, ObjectType } from 'type-graphql';
-import { User } from '../entities/user';
+import { UserInfoResponse } from './userInfoResponse';
 
 @ObjectType()
 export class FollowInfo {
-  @Field(() => [User])
-  followers: User[];
+  @Field(() => [UserInfoResponse])
+  followers: UserInfoResponse[];
 
-  @Field(() => [User])
-  followings: User[];
+  @Field(() => [UserInfoResponse])
+  followings: UserInfoResponse[];
 }

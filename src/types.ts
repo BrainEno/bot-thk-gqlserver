@@ -10,4 +10,5 @@ export type TContext = {
   req: Request;
   res: Response;
   user: UserPayload | null;
+  requestId: string;
 };

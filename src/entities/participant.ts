@@ -1,6 +1,6 @@
 import { prop, Ref } from "@typegoose/typegoose";
 import { ObjectIdScalar as ObjectId } from "../utils/ObjectIdScalar";
-import { ObjectId as ObjectID } from "mongoose";
+import { Types } from "mongoose";
 import { Field, ObjectType } from "type-graphql";
 
 import { User } from "./user";
@@ -9,7 +9,7 @@ import { Conversation } from "./conversation";
 @ObjectType()
 export class Participant {
   @Field(() => ObjectId)
-  readonly _id: ObjectID;
+  readonly _id: Types.ObjectId;
 
   @prop({ ref: "User" })
   @Field(() => User)

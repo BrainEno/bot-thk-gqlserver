@@ -263,12 +263,9 @@ query SearchUsers($name: String!) {
         _id
         username
         name
-        email
-        profile
         about
         photo
-        followingIds
-        followerIds
+        createdAt
     }
 }
 
@@ -276,7 +273,6 @@ query GetUserInfo($username: String!) {
     getUserInfo(username: $username) {
         _id
         createdAt
-        email
         name
         photo
         about
@@ -290,23 +286,17 @@ query GetFollowInfo($username: String) {
             _id
             username
             name
-            email
-            profile
             about
             photo
-            followingIds
-            followerIds
+            createdAt
         }
         followings {
             _id
             username
             name
-            email
-            profile
             about
             photo
-            followingIds
-            followerIds
+            createdAt
         }
     }
 }
