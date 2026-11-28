@@ -23,6 +23,24 @@ test('public profile schema omits private email and relationship fields', () => 
     const internalUserFields = userType.getFields()
     assert.equal(internalUserFields.salt, undefined)
     assert.equal(internalUserFields.hashed_password, undefined)
+    assert.equal(internalUserFields.resetPasswordLink, undefined)
+})
+
+test('conversation removal subscription is part of the additive GraphQL contract', () => {
+    process.env.NODE_ENV = 'test'
+    const schema = createSchema()
+    const subscriptionFields = schema.getSubscriptionType()?.getFields()
+
+    assert.ok(subscriptionFields)
+    assert.equal(subscriptionFields.conversationRemoved.type.toString(), 'String!')
+    assert.deepEqual(
+        subscriptionFields.blogPublished.args.map((arg) => arg.name),
+        ['followingIds']
+    )
+    assert.deepEqual(
+        subscriptionFields.userFollowed.args.map((arg) => arg.name),
+        ['name']
+    )
 })
 
 test('password reset contract requires a token, not an account identifier', () => {

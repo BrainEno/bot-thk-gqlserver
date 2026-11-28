@@ -17,4 +17,6 @@ export class SendMessageArgs {
 
 export interface MessageSentPayload {
   messageSent: Message;
+  /** Server-derived audience. Never use client subscription arguments as authorization. */
+  participantUserIds: string[];
 }

@@ -2,6 +2,7 @@ import { logFailure } from '../services/LogService'
 import { randomUUID } from 'node:crypto'
 import {
   Arg,
+  Authorized,
   Ctx,
   Mutation,
   Query,
@@ -21,7 +22,9 @@ import { NewFollowerPayload } from '../interfaces/notification.interface';
 import { Notification } from '../dtos/notification';
 import { FollowInfo } from '../dtos/followInfo';
 import { UserInfoResponse } from '../dtos/userInfoResponse';
-import { toObjectId } from '../utils/toObjectId';
+import { toObjectId } from '../utils/toObjectId'
+import { isRecipient } from '../services/subscriptionAccess';
+import { areUserIdsEqual } from '../services/userIdentity';
 
 @Resolver()
 class UserResolvers {
@@ -116,7 +119,7 @@ class UserResolvers {
       const toFollow = await UserModel.findOne({ name: followName });
 
       if (!toFollow) throw new Error('该用户不存在或已注销');
-      if (user._id === toFollow._id)
+      if (areUserIdsEqual(user._id, toFollow._id))
         throw new Error('不能关注自己');
 
       if (!curUser.followings) curUser.followings = [];
@@ -145,6 +148,7 @@ class UserResolvers {
           dateString: new Date().toISOString(),
           followerName: curUser.name,
           followedName: toFollow.name,
+          followedUserId: toFollow._id.toString(),
           followerUsername: curUser.username,
         };
 
@@ -251,14 +255,12 @@ class UserResolvers {
     }
   }
 
+  @Authorized()
   @Subscription(() => Notification, {
     topics: Topic.NewNotification,
-    filter: ({
-      payload,
-      args,
-    }) => {
-      return payload.followedName === args.name;
-    },
+    filter: ({ payload, context }) =>
+      'followedUserId' in payload &&
+      isRecipient([payload.followedUserId], context),
   })
   userFollowed(
     @Root() payload: NewFollowerPayload,

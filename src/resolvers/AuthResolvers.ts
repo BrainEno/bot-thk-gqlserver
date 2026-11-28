@@ -136,11 +136,26 @@ class AuthResolvers {
         if (!secret) return invalidResponse
 
         try {
-            const payload = jwt.verify(refreshToken, secret) as User
-            const user = await UserModel.findOne({ _id: payload._id })
-            if (!user || user.tokenVersion !== payload.tokenVersion) {
+            const payload = jwt.verify(refreshToken, secret) as {
+                _id?: unknown
+                tokenVersion?: unknown
+            }
+            if (
+                typeof payload._id !== 'string' ||
+                typeof payload.tokenVersion !== 'number' ||
+                !Number.isSafeInteger(payload.tokenVersion) ||
+                payload.tokenVersion < 0
+            ) {
                 return invalidResponse
             }
+
+            // Compare-and-increment makes each refresh token single-use, including concurrent attempts.
+            const user = await UserModel.findOneAndUpdate(
+                { _id: payload._id, tokenVersion: payload.tokenVersion },
+                { $inc: { tokenVersion: 1 } },
+                { new: true }
+            ).exec()
+            if (!user) return invalidResponse
 
             const { accessToken, accessTokenExpiry } = createAccessToken(user)
             const newRefreshToken = createRefreshToken(user)

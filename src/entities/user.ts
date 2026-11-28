@@ -83,8 +83,8 @@ export class User extends TimeStamps {
     })
     photo: string
 
+    // Keep persisted for compatibility, but never expose reset credentials via GraphQL.
     @prop({ default: '' })
-    @Field({ defaultValue: '' })
     resetPasswordLink: string
 
     @prop({ ref: 'Comment' })

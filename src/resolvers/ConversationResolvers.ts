@@ -2,6 +2,7 @@ import { AuthenticationError } from '../errors/graphqlErrors';
 import { logFailure } from '../services/LogService';
 import {
   Arg,
+  Authorized,
   Ctx,
   Query,
   Mutation,
@@ -17,6 +18,11 @@ import {
   UserModel,
 } from "../models";
 import { GraphQLError } from "graphql";
+import {
+  isConversationParticipant,
+  isRecipient,
+  isRemovedConversationParticipant,
+} from "../services/subscriptionAccess";
 import { publishEvent, Topic } from "../topic";
 import {
   ConversationCreatedPayload,
@@ -25,7 +31,7 @@ import {
   ConversationPopulated,
 } from "../interfaces/conversation.interface";
 import { Conversation } from "../entities/conversation";
-import mongoose, { Types } from "mongoose";
+import { Types } from "mongoose";
 import {
   ConversationUpdated,
   PopulatedConversation,
@@ -319,14 +325,6 @@ export default class ConversationResolvers {
       let addUpdate: ConversationPopulated = toUpdate;
       let removeUpdate: ConversationPopulated = toUpdate;
 
-      const db = await mongoose
-        .createConnection(process.env.MONGODB_URI!)
-        .asPromise();
-
-      const session = await db.startSession();
-
-      session.startTransaction();
-
       if (participantsToDelete.length) {
         await ParticipantModel.deleteMany({
           conversationId,
@@ -411,6 +409,7 @@ export default class ConversationResolvers {
           { _id: conversationId },
           {
             participants: participants.map((p) => p._id),
+            participantUserIds: participants.map((p) => p.userId.toString()),
           }
         );
 
@@ -477,15 +476,21 @@ export default class ConversationResolvers {
         addUpdate = conversation as unknown as ConversationPopulated;
       }
 
-      await session.commitTransaction();
-      await session.endSession();
-
+      const conversationForUpdate = participantsToCreate.length
+        ? addUpdate
+        : participantsToDelete.length
+          ? removeUpdate
+          : toUpdate
+      const recipientUserIds = [
+        ...new Set((conversationForUpdate.participantUserIds ?? []).map(String)),
+      ]
       const payload = {
         conversationUpdated: {
-          conversation: addUpdate || removeUpdate,
+          conversation: conversationForUpdate,
           addedUserIds: participantsToCreate,
           removedUserIds: participantsToDelete,
         },
+        recipientUserIds,
       };
       await publishEvent(Topic.ConversationUpdated, payload);
       return true;
@@ -495,28 +500,16 @@ export default class ConversationResolvers {
     }
   }
 
+  @Authorized()
   @Subscription(() => PopulatedConversation, {
     topics: Topic.ConversationCreated,
-    filter: ({
-      payload,
-      context,
-    }: {
+    filter: ({ payload, context }: {
       payload: ConversationCreatedPayload;
       context: TContext;
-    }) => {
-      if (!context.user) {
-        throw new AuthenticationError("Not authorized");
-      }
-
-      const {
-        conversationCreated: { participantUserIds },
-      } = payload;
-
-      //return if current user is conversation participant
-      return !!participantUserIds?.find(
-        (pId: string) => pId === context?.user?._id.toString()
-      );
-    },
+    }) => isConversationParticipant(
+      payload.conversationCreated.participantUserIds,
+      context
+    ),
   })
   conversationCreated(
     @Root() payload: ConversationCreatedPayload
@@ -524,48 +517,13 @@ export default class ConversationResolvers {
     return payload.conversationCreated;
   }
 
+  @Authorized()
   @Subscription(() => ConversationUpdated, {
     topics: Topic.ConversationUpdated,
-    filter: ({
-      payload,
-      context,
-    }: {
+    filter: ({ payload, context }: {
       payload: ConversationUpdatedPayload;
       context: TContext;
-    }) => {
-      if (!context?.user) {
-        throw new AuthenticationError("Not authorized");
-      }
-
-      const {
-        conversationUpdated: {
-          conversation: { participantUserIds },
-          removedUserIds,
-        },
-      } = payload;
-
-      const userIsParticipant = !!participantUserIds?.find(
-        (id: string) => id === context?.user?._id.toString()
-      );
-
-      const userSentLatestMessage =
-        payload.conversationUpdated.conversation.latestMessage?.senderId ===
-        context.user._id.toString();
-
-      const userIsBeingRemoved =
-        removedUserIds &&
-        Boolean(
-          removedUserIds.find(
-            (id: string) => id === context?.user?._id.toString()
-          )
-        );
-
-      return Boolean(
-        (userIsParticipant && !userSentLatestMessage) ||
-          userSentLatestMessage ||
-          userIsBeingRemoved
-      );
-    },
+    }) => isRecipient(payload.recipientUserIds, context),
   })
   conversationUpdated(
     @Root() payload: ConversationUpdatedPayload
@@ -573,6 +531,22 @@ export default class ConversationResolvers {
     return payload.conversationUpdated;
   }
 
+  @Authorized()
+  @Subscription(() => String, {
+    topics: Topic.ConversationUpdated,
+    filter: ({ payload, context }: {
+      payload: ConversationUpdatedPayload;
+      context: TContext;
+    }) => isRemovedConversationParticipant(
+      payload.conversationUpdated.removedUserIds,
+      context
+    ),
+  })
+  conversationRemoved(@Root() payload: ConversationUpdatedPayload): string {
+    return payload.conversationUpdated.conversation._id.toString()
+  }
+
+  @Authorized()
   @Subscription(() => PopulatedConversation, {
     topics: Topic.ConversationDeleted,
     filter: ({

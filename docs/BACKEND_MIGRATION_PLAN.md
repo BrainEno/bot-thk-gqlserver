@@ -14,7 +14,11 @@
 
 初始迁移期间已落地第一批止血与工程基线改动：修正匿名用户通过 `authChecker`、刷新/登录/忘记密码日志泄漏、使用 scrypt 建立新密码哈希并在旧 HMAC-SHA1 登录成功后渐进升级、密码重置改为短时签名 token 并在一次成功后失效、文章写操作所有权检查、会话读写/消息发送成员检查及已读字段修正；搜索用户/用户资料/关注列表改用白名单 DTO，不再返回邮箱和关系 ID；启动时 Mongo 连接失败会失败退出，加入 `/healthz`/`/readyz` 与 SIGINT/SIGTERM 停机，生产禁用内联 trace/landing page/schema 文件写入，修复 Docker 生产启动路径与 Compose 配置，并加入 CI、README、env 示例和 6 个单元/schema 测试。此处仅记录早期迁移批次，具体现状请以当前代码与 CI 为准。
 
-早期审查列出的后续待办包括 refresh token 仅 HttpOnly cookie 流转/服务端重放检测、所有嵌套 GraphQL 类型的用户字段白名单审计（目前仅搜索/资料/关注查询完成脱敏）、GraphQL SSE 订阅级授权、限流/幂等、媒体 SSRF worker、关系写入事务一致性、分页/DataLoader、完整 Mongo 集成测试与数据库对账。Docker daemon 在当前执行环境不可用，因此 Compose/Docker 构建已配置 CI 校验但未在本地执行。
+本轮订阅授权批次在通知、消息与会话 SSE 订阅上要求认证用户，并只依据服务端生成的事件受众/参与者 ID 投递，不再依赖客户端传入的关注者 ID、用户名或会话 ID 作为授权凭据；消息还要求订阅会话 ID 与事件会话 ID 一致。新增 `conversationRemoved`，被移除成员只获得会话 ID 元数据，其余会话更新只投递给操作后仍在会话中的用户；原有 `blogPublished(followingIds:)` 与 `userFollowed(name:)` 参数保留以维持 schema 兼容。新增确定性授权 helper 与运行时 schema 字段测试；本地 `yarn typecheck`、`yarn lint`、`yarn test`（15 项）、`yarn build`、`git diff --check` 全部通过。尚未执行真实 MongoDB 集成或端到端 SSE 验证，因此此批次不能视为完成完整运行环境门禁。
+
+后续 schema 隐私加固从运行时 `User` GraphQL 类型移除了 `resetPasswordLink`，但保留 Typegoose 持久化字段以兼容已有数据；测试断言运行时 schema 不再暴露该字段。认证补充批次改为以 `tokenVersion` 条件原子递增来消费 refresh token，使同一 token 在并发重放下最多成功一次；同时统一字符串/ObjectId 用户 ID 比较，修复 self-follow 检查因引用类型不同而失效的问题。确定性回归测试覆盖并发 refresh 与 ID 归一化。最新本地 typecheck、lint、17 项 test、build 与 `git diff --check` 均通过。其他嵌套 GraphQL 类型的用户字段白名单审计仍待完成。
+
+早期审查列出的其他后续待办包括 refresh token 改为仅经 HttpOnly cookie 流转（当前仍保留旧 GraphQL 参数/响应以待客户端兼容迁移）、所有嵌套 GraphQL 类型的用户字段白名单审计（搜索/资料/关注查询已使用脱敏 DTO，`resetPasswordLink` 已从 `User` GraphQL 类型移除，其余嵌套字段待审计）、限流/幂等、媒体 SSRF worker、关系写入事务一致性、分页/DataLoader、完整 Mongo 集成测试与数据库对账。Docker daemon 在当前执行环境不可用，因此 Compose/Docker 构建已配置 CI 校验但未在本地执行。
 
 本仓库中的 AI coding-agent 使用方式仅由根目录 `AGENTS.md` 与 [`AGENT_WORKFLOW.md`](./AGENT_WORKFLOW.md) 约定。这些是供开发代理阅读的协作说明，不构成后端运行时组件，也不代表需要在服务中部署 Agent。
 

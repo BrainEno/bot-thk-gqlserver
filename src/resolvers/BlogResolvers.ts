@@ -2,6 +2,7 @@ import { logFailure } from '../services/LogService'
 import { randomUUID } from 'node:crypto'
 import {
     Arg,
+    Authorized,
     Ctx,
     Mutation,
     Query,
@@ -27,6 +28,7 @@ import { publishEvent, Topic } from '../topic'
 import { NewBlogPayload } from '../interfaces/notification.interface'
 import { Notification } from '../dtos/notification'
 import { removeDuplicateObjects } from '../utils/removeDuplicateObjects'
+import { isRecipient } from '../services/subscriptionAccess'
 
 @Resolver()
 class BlogResolvers {
@@ -331,6 +333,7 @@ class BlogResolvers {
                     typeof curUser._id === 'string'
                         ? curUser._id
                         : curUser._id.toString(),
+                recipientUserIds: [...new Set(curUser.followerIds ?? [])],
             })
 
             return { success: true, blog }
@@ -415,14 +418,12 @@ class BlogResolvers {
         return deleted !== null
     }
 
+    @Authorized()
     @Subscription(() => Notification, {
         topics: Topic.NewNotification,
-        filter: ({
-            payload,
-            args,
-        }) => {
-            return args.followingIds.includes(payload.authorId)
-        },
+        filter: ({ payload, context }) =>
+            'recipientUserIds' in payload &&
+            isRecipient(payload.recipientUserIds, context),
     })
     blogPublished(
         @Root() payload: NewBlogPayload,

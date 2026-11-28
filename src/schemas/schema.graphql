@@ -33,7 +33,6 @@ type User {
   about: String
   role: String!
   photo: String!
-  resetPasswordLink: String!
   commented: [Comment!]!
   likedBlogs: [Blog!]!
   followings: [User!]!
@@ -246,6 +245,7 @@ type Subscription {
   conversationCreated: PopulatedConversation!
   conversationUpdated: ConversationUpdated!
   conversationDeleted: PopulatedConversation!
+  conversationRemoved: String!
   messageSent: Message!
 }
 

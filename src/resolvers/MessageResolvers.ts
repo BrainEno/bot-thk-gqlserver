@@ -2,6 +2,7 @@ import { AuthenticationError } from '../errors/graphqlErrors';
 import { logFailure } from '../services/LogService';
 import {
   Resolver,
+  Authorized,
   Query,
   Arg,
   Ctx,
@@ -23,6 +24,7 @@ import {
   ConversationPopulated,
 } from "../interfaces/conversation.interface";
 import mongoose from "mongoose";
+import { canReceiveMessage } from "../services/subscriptionAccess";
 
 @Resolver()
 export default class MessageResolvers {
@@ -182,11 +184,15 @@ export default class MessageResolvers {
         )
         .exec()) as unknown as ConversationPopulated;
 
-      await publishEvent(Topic.MessageSent, { messageSent: newMessage });
+      await publishEvent(Topic.MessageSent, {
+        messageSent: newMessage,
+        participantUserIds: conversationInDB.participantUserIds ?? [],
+      });
       await publishEvent(Topic.ConversationUpdated, {
         conversationUpdated: {
           conversation: newConversation,
         },
+        recipientUserIds: conversationInDB.participantUserIds ?? [],
       });
 
       return true;
@@ -196,11 +202,16 @@ export default class MessageResolvers {
     }
   }
 
+  @Authorized()
   @Subscription(() => Message, {
     topics: Topic.MessageSent,
-    filter: ({ payload, args: { conversationId } }) => {
-      return payload.messageSent.conversationId === conversationId;
-    },
+    filter: ({ payload, args: { conversationId }, context }) =>
+      canReceiveMessage(
+        payload.messageSent.conversationId,
+        conversationId,
+        payload.participantUserIds,
+        context
+      ),
   })
   messageSent(@Root() payload: MessageSentPayload) {
     return payload.messageSent;
